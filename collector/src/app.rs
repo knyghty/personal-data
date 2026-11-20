@@ -107,7 +107,7 @@ pub(crate) struct Config {
     pub ha_backfill_days: i64,
     /// Entity that tracks the phone's location.
     pub ha_location_entity: Option<String>,
-    /// Home Assistant notify service that gets the offer alerts, e.g. `mobile_app_toms_iphone`. Unset sends none.
+    /// Home Assistant notify service that gets the offer alerts, e.g. `mobile_app_<phone>`. Unset sends none.
     pub ha_notify: Option<String>,
     /// Days of Home Assistant long-term statistics to backfill.
     pub ha_stats_backfill_days: i64,
@@ -529,7 +529,7 @@ impl Env {
             lastfm_api_key: self.get("LASTFM_API_KEY"),
             lastfm_api_url: "https://ws.audioscrobbler.com/2.0/".into(),
             lastfm_user: self.get("LASTFM_USER"),
-            // NL49017 Amsterdam-Stadhouderskade is about 3.5 km from home.
+            // NL49017 is Amsterdam-Stadhouderskade.
             luchtmeetnet_stations: self.list("LUCHTMEETNET_STATIONS", "NL49017"),
             luchtmeetnet_url: "https://api.luchtmeetnet.nl/open_api".into(),
             moneybird_api_url: "https://moneybird.com/api/v2".into(),

@@ -91,7 +91,7 @@ async fn skips_old_gaps_and_waits_for_unpublished_steps() -> Result<()> {
     let app = testing::app_with(&github, |cfg| {
         cfg.knmi_wms_key = Some("wms-key".to_owned());
         cfg.knmi_wms_url = base;
-        cfg.home = Some((52.35_f64, 4.85_f64));
+        cfg.home = Some((52.3731_f64, 4.8922_f64));
     });
     tri!(app.store.set(CURSOR, &start));
     tri!(KnmiRadar.hourly(&app).await);

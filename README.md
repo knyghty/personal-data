@@ -317,7 +317,7 @@ Measured volume: about 85 MB per year, and about 20 MB for a backfill from 2019.
 
 ### Luchtmeetnet
 
-No setup. The Luchtmeetnet open API (RIVM) needs no key. It is its own source, not a `weather` type, because it measures at fixed stations while `weather` models the phone's position. `LUCHTMEETNET_STATIONS` lists the station numbers, comma-separated. The default is `NL49017`, Amsterdam-Stadhouderskade, a traffic station about 3.5 km from home. `https://api.luchtmeetnet.nl/open_api/stations` lists the others.
+No setup. The Luchtmeetnet open API (RIVM) needs no key. It is its own source, not a `weather` type, because it measures at fixed stations while `weather` models the phone's position. `LUCHTMEETNET_STATIONS` lists the station numbers, comma-separated. The default is `NL49017`, Amsterdam-Stadhouderskade, a traffic station. `https://api.luchtmeetnet.nl/open_api/stations` lists the others.
 
 - `measurement`: `/measurements` for the last three hours, every component the station measures. NL49017 measures NO2, NO, PM10, PM2.5, soot (`FN`), benzene, toluene and xylene, but not O3. Each value is the mean of the hour that ends at `timestamp_measured`.
 - `lki`: `/lki`, the Dutch air quality index from 1 to 11, for the same hours.
@@ -542,7 +542,7 @@ The `offers` source stores the weekly offers of the shops the owner buys from. W
 
 1. `OFFERS_PRIJSPROFEET` lists the PrijsProfeet retailer keys, default `albert_heijn,dirk`. Empty turns the supermarket pull off.
 2. Optional: request a free key at `https://www.prijsprofeet.nl/api#gratis-key` (email, click the link) and `fly secrets set PRIJSPROFEET_KEY=...`. Without it the public limit of 30 requests a minute applies and a run takes about two minutes longer. The free tier asks for a "data by PrijsProfeet" link wherever the data is shown. The Offers dashboard carries one.
-3. `fly secrets set HA_NOTIFY=mobile_app_toms_iphone`, the notify service that gets the alerts. Needs `HA_URL` and `HA_TOKEN`. Unset sends none.
+3. `fly secrets set HA_NOTIFY=mobile_app_<phone>`, the notify service that gets the alerts. Needs `HA_URL` and `HA_TOKEN`. Unset sends none.
 4. Copy `pi/push_offers.py` to `/config/custom_templates/` on the Pi, next to `personal_data_network.json`, which gives it the collector URL and secret. The stores default to Kruidvat and Etos. A `personal_data_offers.json` next to it with `{"stores": ["kruidvat", "etos"]}` overrides them. Add `push_offers: python3 /config/custom_templates/push_offers.py --detach` under `shell_command`, reload it, and create an automation that calls it once a day. The `--detach` flag forks the script, because Home Assistant kills a shell command after 60 seconds and a run takes longer. The script logs one line per store to `personal_data_offers.log`.
 
 The watch list is `duckdb/watchlist.json`, one entry per item. An entry has a `label` and a case-insensitive regex `pattern` over the offer name. An optional `exclude` regex rules a matching offer out, for example kids' vitamins. It names the `stores` it applies to (`null` for all) and a `till` regex. The `till` regex matches the Albert Heijn till name in receipts and gives the usual price in the `watched_offer` table. Edit the file and push. The collector reads it from the repo on every run that has new offers.
@@ -579,7 +579,7 @@ Without these two secrets the collector only reports to Sentry.
 The raw files keep every copy, because the sources disagree in detail and timing. When you query, use the most direct source and drop the copies. Home Assistant holds the least detail, so it is always the copy to drop:
 
 - Withings measurements: use `raw/withings/`. Exclude Home Assistant entities from the Withings integration (`sensor.withings_*`, or look up the integration in `registry_entity`). In Apple Health, exclude samples whose `source` is `Health Mate` or `Withings`.
-- Apple Watch and iPhone data: use `raw/apple_health/`. Exclude Home Assistant entities from the companion app (`sensor.toms_iphone_*`).
+- Apple Watch and iPhone data: use `raw/apple_health/`. Exclude Home Assistant entities from the companion app (`sensor.<phone>_*`).
 - Home sensors: Home Assistant is the direct source.
 - Food: use `macrofactor_food` for the days its exports cover. For later days, use the dietary samples in `apple_sample`.
 

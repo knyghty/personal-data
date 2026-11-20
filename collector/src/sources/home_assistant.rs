@@ -186,7 +186,7 @@ impl<'app> Ha<'app> {
             .map(|(url, token)| Self { app, token, url })
     }
 
-    /// Send a notification through the notify `service`, e.g. `mobile_app_toms_iphone`.
+    /// Send a notification through the notify `service`, e.g. `mobile_app_<phone>`.
     ///
     /// # Errors
     /// The service call fails or is refused.
