@@ -1,0 +1,76 @@
+{
+  "uid": "browse",
+  "title": "Browse",
+  "description": "Pick a table to see what it is, its columns, how many rows it has per week and its latest rows.",
+  "tags": ["personal-data"],
+  "timezone": "Europe/Amsterdam",
+  "editable": true,
+  "schemaVersion": 41,
+  "time": {"from": "now-5y", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "table", "label": "Table", "type": "query",
+        "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+        "query": {"queryType": "infinity", "query": "", "infinityQuery": {"refId": "variable", "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'main' AND table_name <> 'build_info' ORDER BY 1"},
+          "columns": [{"selector": "table_name", "text": "table_name", "type": "string"}]}},
+        "refresh": 1, "current": {"text": "sleep_night", "value": "sleep_night"}, "sort": 1
+      },
+      {
+        "name": "time_col", "label": "Time column", "type": "query",
+        "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+        "query": {"queryType": "infinity", "query": "", "infinityQuery": {"refId": "variable", "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT column_name FROM duckdb_columns() WHERE schema_name = 'main' AND table_name = '${table}' AND (data_type LIKE 'TIMESTAMP%' OR data_type = 'DATE') ORDER BY column_index"},
+          "columns": [{"selector": "column_name", "text": "column_name", "type": "string"}]}},
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "table", "title": "About ${table}",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "options": {"showHeader": false, "cellHeight": "lg"},
+      "fieldConfig": {"defaults": {"custom": {"cellOptions": {"type": "auto", "wrapText": true}}}, "overrides": []},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "SELECT coalesce(comment, 'No description.') || ' (about ' || estimated_size || ' rows)' AS about FROM duckdb_tables() WHERE schema_name = 'main' AND table_name = '${table}'"},
+        "columns": [{"selector": "about", "text": "about", "type": "string"}]}]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Rows per week, by ${time_col}",
+      "gridPos": {"x": 0, "y": 4, "w": 16, "h": 9},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0}}, "overrides": []},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "SELECT date_trunc('week', \"${time_col}\")::TIMESTAMP AS time, count(*) AS rows FROM \"${table}\" WHERE \"${time_col}\" >= DATE '${__from:date:YYYY-MM-DD}' AND \"${time_col}\" < DATE '${__to:date:YYYY-MM-DD}' + 1 GROUP BY 1 ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "rows", "text": "rows", "type": "number"}]}]
+    },
+    {
+      "id": 3, "type": "table", "title": "Columns",
+      "gridPos": {"x": 16, "y": 4, "w": 8, "h": 9},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "SELECT column_name AS column, lower(data_type) AS type FROM duckdb_columns() WHERE schema_name = 'main' AND table_name = '${table}' ORDER BY column_index"},
+        "columns": [{"selector": "column", "text": "column", "type": "string"}, {"selector": "type", "text": "type", "type": "string"}]}]
+    },
+    {
+      "id": 4, "type": "table", "title": "Latest rows of ${table}",
+      "description": "The newest 500 rows by the time column (or the first 500 when the table has none). Click a header to sort, the funnel to filter.",
+      "gridPos": {"x": 0, "y": 13, "w": 24, "h": 16},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "fieldConfig": {"defaults": {"custom": {"filterable": true, "cellOptions": {"type": "auto"}}}, "overrides": []},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "SELECT COLUMNS(lambda c: c <> 'raw') FROM \"${table}\" ORDER BY COLUMNS('${time_col}') DESC NULLS LAST LIMIT 500"},
+        "columns": []}]
+    }
+  ]
+}

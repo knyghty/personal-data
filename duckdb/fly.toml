@@ -1,0 +1,40 @@
+app = "dawn-meadowbrook-804"
+primary_region = "ams"
+kill_timeout = "300s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  GITHUB_REPO = "knyghty/personal-data"
+  GITHUB_BRANCH = "main"
+  # The local copy of the bucket's raw/ goes under RAW_ROOT. The tables live in DuckLake on the volume: reading
+  # their Parquet files from the bucket made a query over a week of Home Assistant data 25 times slower.
+  RAW_ROOT = "/data"
+  LAKE_CATALOG = "/data/catalog.sqlite"
+  LAKE_DATA = "/data/lake/"
+  DUCKDB_MEMORY_LIMIT = "1GB"
+  DUCKDB_THREADS = "2"
+  # At 1 GB the build ran out of memory on ha_history and dns_query from 2026-11-10.
+  DUCKDB_BUILD_MEMORY_LIMIT = "2GB"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The server exits after IDLE_SECONDS without requests or builds, so a build in the background is never cut
+  # short; the proxy starts the machine again on the next request.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[restart]]
+  policy = "on-failure"
+  retries = 5
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[vm]]
+  size = "performance-1x"
+  memory = "4gb"  # the build peaked near 1.8 GB with DuckDB limited to 1 GB

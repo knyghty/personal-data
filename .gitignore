@@ -1,0 +1,11 @@
+collector/target/
+mac/target/
+.env
+.DS_Store
+personal.duckdb*
+__pycache__/
+.claude/worktrees/
+# duckdb/build.sh: the local copy of the bucket's raw files and the local DuckLake.
+/raw/
+/lake/
+lake.sqlite*

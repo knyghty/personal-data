@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add passkey</title>
+<style>
+  body { font: 16px system-ui, sans-serif; max-width: 30rem; margin: 4rem auto; padding: 0 1rem; color: #222; background: #fafafa; }
+  button { font: inherit; padding: .7rem 1.2rem; border-radius: .5rem; border: 0; background: #2563eb; color: #fff; cursor: pointer; }
+  p.msg { margin-top: 1rem; }
+  @media (prefers-color-scheme: dark) { body { color: #eee; background: #111; } }
+</style>
+</head>
+<body>
+<h1>Add a passkey</h1>
+<p>Creates a passkey for the personal data map on this device. Add one per device or password manager you want to sign in with.</p>
+<button id="go">Add passkey</button>
+<p class="msg" id="msg"></p>
+<script>
+const msg = document.getElementById("msg");
+document.getElementById("go").onclick = async () => {
+  try {
+    const base = location.pathname.replace(/\/$/, "");
+    const options = await (await fetch(base + "/options", { method: "POST" })).json();
+    const cred = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options) });
+    const r = await fetch(base + "/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cred.toJSON()) });
+    const out = await r.json();
+    msg.textContent = r.ok ? `Added. ${out.passkeys} passkey(s) registered. Sign in at /login.` : `Failed: ${out.error}`;
+  } catch (e) {
+    msg.textContent = `Failed: ${e.message}`;
+  }
+};
+</script>
+</body>
+</html>

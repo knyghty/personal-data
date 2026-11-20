@@ -1,0 +1,16 @@
+# The DuckDB query server's POST /sql: the body is one SQL query, the reply JSON rows.
+apiVersion: 1
+datasources:
+  - name: Personal data
+    uid: personal
+    type: yesoreyeram-infinity-datasource
+    isDefault: true
+    url: https://dawn-meadowbrook-804.fly.dev
+    jsonData:
+      url: https://dawn-meadowbrook-804.fly.dev
+      allowedHosts:
+        - https://dawn-meadowbrook-804.fly.dev
+      httpHeaderName1: Authorization
+      timeoutInSeconds: 120
+    secureJsonData:
+      httpHeaderValue1: Bearer $MCP_TOKEN

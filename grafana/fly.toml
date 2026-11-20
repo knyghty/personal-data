@@ -1,0 +1,41 @@
+# Grafana over the personal data. It has no public address: the query server proxies /grafana to it over the
+# private network (flycast) after a passkey login and sets X-WEBAUTH-USER, which Grafana trusts from anything that
+# reaches it, i.e. only apps in this Fly organisation. It runs all the time so alert rules are evaluated.
+app = "personal-data-grafana"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # GF_SERVER_ROOT_URL, the public address under /grafana/, is a secret.
+  GF_SERVER_SERVE_FROM_SUB_PATH = "true"
+  GF_AUTH_PROXY_ENABLED = "true"
+  GF_AUTH_PROXY_HEADER_NAME = "X-WEBAUTH-USER"
+  GF_AUTH_PROXY_HEADER_PROPERTY = "username"
+  GF_AUTH_PROXY_AUTO_SIGN_UP = "true"
+  GF_AUTH_DISABLE_LOGIN_FORM = "true"
+  GF_AUTH_DISABLE_SIGNOUT_MENU = "true"
+  GF_AUTH_ANONYMOUS_ENABLED = "false"
+  GF_USERS_ALLOW_SIGN_UP = "false"
+  GF_USERS_AUTO_ASSIGN_ORG_ROLE = "Admin"
+  GF_SECURITY_ADMIN_USER = "tom"
+  GF_ANALYTICS_REPORTING_ENABLED = "false"
+  GF_ANALYTICS_CHECK_FOR_UPDATES = "false"
+  GF_DATE_FORMATS_DEFAULT_TIMEZONE = "Europe/Amsterdam"
+  GF_USERS_DEFAULT_THEME = "system"
+
+[http_service]
+  internal_port = 3000
+  force_https = false
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[mounts]]
+  source = "grafana_data"
+  destination = "/var/lib/grafana"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

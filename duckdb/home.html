@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal data</title>
+<style>
+  :root { --bg: #fafafa; --fg: #1d1d1f; --muted: #6b6b70; --card: #fff; --line: #e4e4e8; --accent: #2563eb; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --fg: #ececef; --muted: #9a9aa2; --card: #1b1b1f; --line: #2c2c33; --accent: #6b9bff; } }
+  body { font: 16px system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+  main { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; display: flex; flex-direction: column; gap: 1rem; }
+  h1 { margin: 0 0 .5rem; font-weight: 600; }
+  a.card { display: block; padding: 1rem 1.2rem; background: var(--card); border: 1px solid var(--line); border-radius: .75rem; color: inherit; text-decoration: none; }
+  a.card:hover, a.card:focus-visible { border-color: var(--accent); outline: none; }
+  a.card b { display: block; color: var(--accent); margin-bottom: .2rem; }
+  a.card span { color: var(--muted); font-size: .95rem; }
+  p.small { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Personal data</h1>
+  <a class="card" href="/grafana/d/trends"><b>Trends</b><span>Sleep, heart, activity, weight, spending and screens, with 7- and 28-day averages.</span></a>
+  <a class="card" href="/grafana/d/browse"><b>Browse</b><span>Pick a table: what it holds, its rows per week and its latest rows, to sort and filter.</span></a>
+  <a class="card" href="/grafana/explore"><b>Explore</b><span>Query any table with SQL and chart the result.</span></a>
+  <a class="card" href="/grafana/alerting/list"><b>Alerts</b><span>Rules that notice when something gets better or worse.</span></a>
+  <a class="card" href="/map"><b>Map</b><span>Location, photos, flights, rain radar, noise, swimming spots and water temperature.</span></a>
+  <p class="small"><a href="/passkey">Add a passkey</a> for another device.</p>
+</main>
+</body>
+</html>

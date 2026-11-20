@@ -1,0 +1,87 @@
+{
+  "uid": "offers",
+  "title": "Offers",
+  "description": "Supermarket and drugstore offers on the watch list in duckdb/watchlist.json. Supermarket data by PrijsProfeet (https://www.prijsprofeet.nl), drugstore data from folderz.nl.",
+  "tags": ["personal-data"],
+  "timezone": "Europe/Amsterdam",
+  "editable": true,
+  "schemaVersion": 41,
+  "time": {"from": "now-90d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "On offer now, from the watch list",
+      "description": "Live offers that match the watch list. Saving is against the old price, or against what the owner usually pays at AH when the store shows none. Data by PrijsProfeet, https://www.prijsprofeet.nl.",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 12},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "options": {"showHeader": true, "cellHeight": "sm", "sortBy": [{"displayName": "saving_pct", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"custom": {"cellOptions": {"type": "auto"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "saving_pct"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 0}]},
+          {"matcher": {"id": "byName", "options": "price"}, "properties": [{"id": "unit", "value": "currencyEUR"}]},
+          {"matcher": {"id": "byName", "options": "original_price"}, "properties": [{"id": "unit", "value": "currencyEUR"}]},
+          {"matcher": {"id": "byName", "options": "usual_price"}, "properties": [{"id": "unit", "value": "currencyEUR"}]},
+          {"matcher": {"id": "byName", "options": "url"}, "properties": [{"id": "links", "value": [{"title": "Open the offer", "url": "${__value.raw}", "targetBlank": true}]}]}
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT label, store, name, price, original_price, usual_price, saving_pct, coalesce(promo, mechanic, quality) AS deal, valid_from, valid_until, url FROM watched_offer WHERE valid_until >= current_date ORDER BY saving_pct DESC NULLS LAST, label"},
+          "columns": []
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "How often each watched item is on offer",
+      "description": "Offers per item in the dashboard's time range, with the best price seen. Items with no offer in the range are missing.",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 10},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "fieldConfig": {
+        "defaults": {"custom": {"cellOptions": {"type": "auto"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "best_price"}, "properties": [{"id": "unit", "value": "currencyEUR"}]},
+          {"matcher": {"id": "byName", "options": "usual_price"}, "properties": [{"id": "unit", "value": "currencyEUR"}]}
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT label, count(*) AS offers, count(DISTINCT store) AS stores, min(price) AS best_price, any_value(usual_price) AS usual_price, max(first_seen)::DATE AS last_seen FROM watched_offer WHERE first_seen >= '${__from:date}' AND first_seen <= '${__to:date}' GROUP BY label ORDER BY offers DESC, label"},
+          "columns": []
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Offers stored per store and week",
+      "description": "How many new offers each store listed per week, all items, not only watched ones.",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 10},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "fieldConfig": {"defaults": {"custom": {"cellOptions": {"type": "auto"}}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT date_trunc('week', first_seen AT TIME ZONE 'Europe/Amsterdam')::DATE AS week, store, count(*) AS offers FROM offer WHERE first_seen >= '${__from:date}' AND first_seen <= '${__to:date}' GROUP BY week, store ORDER BY week DESC, store"},
+          "columns": []
+        }
+      ]
+    }
+  ]
+}

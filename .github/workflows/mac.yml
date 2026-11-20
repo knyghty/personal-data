@@ -1,0 +1,38 @@
+name: mac
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mac/**"
+      - ".github/workflows/mac.yml"
+  pull_request:
+    paths:
+      - "mac/**"
+      - ".github/workflows/mac.yml"
+
+defaults:
+  run:
+    working-directory: mac
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      # Only mac/, the part this job builds.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: mac
+          filter: blob:none
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mac
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo doc --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: cargo test

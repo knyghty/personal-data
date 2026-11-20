@@ -1,0 +1,70 @@
+name: collector
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "collector/**"
+      - ".github/workflows/collector.yml"
+  pull_request:
+    paths:
+      - "collector/**"
+      - ".github/workflows/collector.yml"
+
+concurrency:
+  group: collector-deploy
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: collector
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Only collector/, the part this job builds.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: collector
+          filter: blob:none
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: collector
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo doc --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: cargo test
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: collector
+          filter: blob:none
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Smoke run
+        env:
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+        run: |
+          curl -fsS --retry 5 --retry-all-errors https://glimmering-voice-610.fly.dev/health
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o run.json -w '%{http_code}' --max-time 1800 -X POST \
+              -H "Authorization: Bearer $ADMIN_SECRET" https://glimmering-voice-610.fly.dev/admin/run)
+            if [ "$code" != "409" ]; then break; fi
+            echo "a run is in progress, waiting"; sleep 30
+          done
+          cat run.json; echo
+          test "$code" = "200"

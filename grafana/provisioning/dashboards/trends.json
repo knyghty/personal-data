@@ -1,0 +1,113 @@
+{
+  "uid": "trends",
+  "title": "Trends",
+  "description": "Daily values with 7- and 28-day averages: a 7-day line that stays above or below the 28-day line is a trend.",
+  "tags": ["personal-data"],
+  "timezone": "Europe/Amsterdam",
+  "editable": true,
+  "schemaVersion": 41,
+  "time": {"from": "now-1y", "to": "now"},
+  "refresh": "",
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Sleep (hours asleep)",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"unit": "h", "decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT wake_date AS day, asleep_h AS value FROM sleep_night), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Bedtime (hours after midnight before; 24.5 is 00:30)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT wake_date - 1 AS day, bedtime_h AS value FROM sleep_night), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Resting heart rate (bpm)",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, avg(qty) AS value FROM apple_sample WHERE name = 'resting_heart_rate' GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Heart rate variability (ms)",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, avg(qty) AS value FROM apple_sample WHERE name = 'heart_rate_variability' GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "VO2 max (ml/kg/min)",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, avg(qty) AS value FROM apple_sample WHERE name = 'vo2_max' GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Steps per day",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, sum(qty) AS value FROM apple_sample WHERE name = 'step_count' GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Weight (kg, Withings scale)",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"unit": "masskg", "decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 4}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, avg(weight_kg) AS value FROM withings_body GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Card spending (€ per day)",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH s AS (SELECT unnest(generate_series(DATE '2019-01-01', current_date, INTERVAL 1 DAY))::DATE AS day), c AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, sum(amount)::DOUBLE AS value FROM card_purchase GROUP BY 1), d AS (SELECT s.day, coalesce(c.value, 0) AS value FROM s LEFT JOIN c USING (day)), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "YouTube videos per day",
+      "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH s AS (SELECT unnest(generate_series(DATE '2019-01-01', current_date, INTERVAL 1 DAY))::DATE AS day), c AS (SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, count(*) AS value FROM youtube_history WHERE NOT is_ad GROUP BY 1), d AS (SELECT s.day, coalesce(c.value, 0) AS value FROM s LEFT JOIN c USING (day)), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "iPhone screen time (hours per day)",
+      "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"unit": "h", "decimals": 1, "custom": {"lineWidth": 2, "spanNulls": true}}, "overrides": [{"matcher": {"id": "byName", "options": "daily"}, "properties": [{"id": "custom.drawStyle", "value": "points"}, {"id": "custom.pointSize", "value": 3}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "#8884"}}]}, {"matcher": {"id": "byName", "options": "7-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}, {"id": "custom.lineWidth", "value": 1.5}]}, {"matcher": {"id": "byName", "options": "28-day average"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}, {"id": "custom.lineWidth", "value": 3}]}]},
+      "targets": [{"refId": "A", "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"}, "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+        "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+          "data": "WITH d AS (SELECT (start_ts AT TIME ZONE 'Europe/Amsterdam')::DATE AS day, sum(seconds) / 3600 AS value FROM screen_time_app WHERE platform = 'ios' GROUP BY 1), r AS (SELECT day, value, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW) AS avg_7d, avg(value) OVER (ORDER BY day RANGE BETWEEN INTERVAL 27 DAY PRECEDING AND CURRENT ROW) AS avg_28d FROM d) SELECT day::TIMESTAMP AS time, value, avg_7d, avg_28d FROM r WHERE day BETWEEN DATE '${__from:date:YYYY-MM-DD}' AND DATE '${__to:date:YYYY-MM-DD}' ORDER BY 1"},
+        "columns": [{"selector": "time", "text": "time", "type": "timestamp"}, {"selector": "value", "text": "daily", "type": "number"}, {"selector": "avg_7d", "text": "7-day average", "type": "number"}, {"selector": "avg_28d", "text": "28-day average", "type": "number"}]}]
+    }
+  ]
+}

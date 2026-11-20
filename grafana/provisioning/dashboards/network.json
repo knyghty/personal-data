@@ -1,0 +1,265 @@
+{
+  "title": "Network",
+  "uid": "network",
+  "schemaVersion": 41,
+  "editable": true,
+  "tags": ["network"],
+  "time": {"from": "now-7d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HomePod signal at the access point",
+      "description": "Signal of each HomePod as the AP hears it. Above -65 dBm is comfortable, below -75 dBm stutters.",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "dBm", "decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true, "pointSize": 4}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Bedroom"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}]},
+          {"matcher": {"id": "byName", "options": "Bedroom 2"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#199e70"}}]},
+          {"matcher": {"id": "byName", "options": "Kitchen"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}]},
+          {"matcher": {"id": "byName", "options": "Left"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#9085e9"}}]},
+          {"matcher": {"id": "byName", "options": "Right"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d55181"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT ts AS time, max(CASE WHEN mac = '68:e5:80:01:b8:ee' THEN signal_dbm END) AS bedroom, max(CASE WHEN mac = '68:e5:80:12:81:1f' THEN signal_dbm END) AS bedroom_2, max(CASE WHEN mac = '68:e5:80:19:a9:91' THEN signal_dbm END) AS kitchen, max(CASE WHEN mac = 'b0:67:b5:01:4b:0c' THEN signal_dbm END) AS left_, max(CASE WHEN mac = 'b0:67:b5:09:6b:19' THEN signal_dbm END) AS right_ FROM wifi_client WHERE ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY GROUP BY 1 ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "bedroom", "text": "Bedroom", "type": "number"},
+            {"selector": "bedroom_2", "text": "Bedroom 2", "type": "number"},
+            {"selector": "kitchen", "text": "Kitchen", "type": "number"},
+            {"selector": "left_", "text": "Left", "type": "number"},
+            {"selector": "right_", "text": "Right", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HomePod link rate, AP to speaker",
+      "description": "The rate the AP negotiated towards each speaker. The big HomePods top out at 72 Mbit/s (802.11n); the minis go to 344 Mbit/s and more.",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "Mbits", "decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true, "pointSize": 4}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Bedroom"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}]},
+          {"matcher": {"id": "byName", "options": "Bedroom 2"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#199e70"}}]},
+          {"matcher": {"id": "byName", "options": "Kitchen"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}]},
+          {"matcher": {"id": "byName", "options": "Left"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#9085e9"}}]},
+          {"matcher": {"id": "byName", "options": "Right"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d55181"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT ts AS time, max(CASE WHEN mac = '68:e5:80:01:b8:ee' THEN tx_rate_kbps END) / 1000.0 AS bedroom, max(CASE WHEN mac = '68:e5:80:12:81:1f' THEN tx_rate_kbps END) / 1000.0 AS bedroom_2, max(CASE WHEN mac = '68:e5:80:19:a9:91' THEN tx_rate_kbps END) / 1000.0 AS kitchen, max(CASE WHEN mac = 'b0:67:b5:01:4b:0c' THEN tx_rate_kbps END) / 1000.0 AS left_, max(CASE WHEN mac = 'b0:67:b5:09:6b:19' THEN tx_rate_kbps END) / 1000.0 AS right_ FROM wifi_client WHERE ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY GROUP BY 1 ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "bedroom", "text": "Bedroom", "type": "number"},
+            {"selector": "bedroom_2", "text": "Bedroom 2", "type": "number"},
+            {"selector": "kitchen", "text": "Kitchen", "type": "number"},
+            {"selector": "left_", "text": "Left", "type": "number"},
+            {"selector": "right_", "text": "Right", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Air time in use per band",
+      "description": "Share of the hour the channel was busy, as the AP measures it. Solid: everything it heard, neighbours included. Dashed: the AP's own traffic. A big gap between the two is the neighbours.",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 0, "custom": {"lineWidth": 2, "spanNulls": true}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "5 GHz busy"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}]},
+          {"matcher": {"id": "byName", "options": "5 GHz own"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [6, 4]}}]},
+          {"matcher": {"id": "byName", "options": "2.4 GHz busy"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}]},
+          {"matcher": {"id": "byName", "options": "2.4 GHz own"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [6, 4]}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT ts AS time, max(CASE WHEN radio = 'na' THEN cu_total END) AS busy5, max(CASE WHEN radio = 'na' THEN cu_self_tx + cu_self_rx END) AS own5, max(CASE WHEN radio = 'ng' THEN cu_total END) AS busy24, max(CASE WHEN radio = 'ng' THEN cu_self_tx + cu_self_rx END) AS own24 FROM wifi_radio WHERE ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY GROUP BY 1 ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "busy5", "text": "5 GHz busy", "type": "number"},
+            {"selector": "own5", "text": "5 GHz own", "type": "number"},
+            {"selector": "busy24", "text": "2.4 GHz busy", "type": "number"},
+            {"selector": "own24", "text": "2.4 GHz own", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Clients and neighbouring networks per band",
+      "description": "Solid: devices connected to each band. Dashed: other people's networks the AP hears on that band, a count of beacons, so the congestion around the flat.",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"lineWidth": 2, "spanNulls": true}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "5 GHz clients"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}]},
+          {"matcher": {"id": "byName", "options": "5 GHz neighbours"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [6, 4]}}]},
+          {"matcher": {"id": "byName", "options": "2.4 GHz clients"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}]},
+          {"matcher": {"id": "byName", "options": "2.4 GHz neighbours"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [6, 4]}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "WITH r AS (SELECT ts, max(CASE WHEN radio = 'na' THEN clients END) AS clients5, max(CASE WHEN radio = 'ng' THEN clients END) AS clients24 FROM wifi_radio GROUP BY 1), n AS (SELECT ts, sum(CASE WHEN radio = 'na' THEN count END) AS neighbours5, sum(CASE WHEN radio = 'ng' THEN count END) AS neighbours24 FROM wifi_neighbour_hour GROUP BY 1) SELECT r.ts AS time, clients5, neighbours5, clients24, neighbours24 FROM r LEFT JOIN n USING (ts) WHERE r.ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND r.ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "clients5", "text": "5 GHz clients", "type": "number"},
+            {"selector": "neighbours5", "text": "5 GHz neighbours", "type": "number"},
+            {"selector": "clients24", "text": "2.4 GHz clients", "type": "number"},
+            {"selector": "neighbours24", "text": "2.4 GHz neighbours", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "DNS queries per hour by device",
+      "description": "What each device asked the Pi's resolver, counted per hour. A rough proxy for which device was in use.",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"drawStyle": "bars", "fillOpacity": 85, "lineWidth": 0, "stacking": {"mode": "normal", "group": "A"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Mac"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3987e5"}}]},
+          {"matcher": {"id": "byName", "options": "iPhone"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#d95926"}}]},
+          {"matcher": {"id": "byName", "options": "iPad"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#199e70"}}]},
+          {"matcher": {"id": "byName", "options": "TV"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#c98500"}}]},
+          {"matcher": {"id": "byName", "options": "HomePods"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#9085e9"}}]},
+          {"matcher": {"id": "byName", "options": "Other"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#888888"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "WITH q AS (SELECT from_ts, count, CASE WHEN client_name = 'MacBookPro' THEN 'mac' WHEN client_name ILIKE '%iphone%' THEN 'iphone' WHEN client_name ILIKE '%ipad%' THEN 'ipad' WHEN client_name IN ('Apple TV', 'Living-Room', 'Chromecast Ultra', 'Chromecast-Ultra') THEN 'tv' WHEN client_name LIKE 'HomePod%' OR client_name IN ('Bedroom', 'Bedroom8012811F', 'Kitchen', 'L', 'R') THEN 'homepods' ELSE 'other' END AS dev FROM dns_query WHERE from_ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND from_ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY) SELECT from_ts AS time, sum(CASE WHEN dev = 'mac' THEN count END) AS mac, sum(CASE WHEN dev = 'iphone' THEN count END) AS iphone, sum(CASE WHEN dev = 'ipad' THEN count END) AS ipad, sum(CASE WHEN dev = 'tv' THEN count END) AS tv, sum(CASE WHEN dev = 'homepods' THEN count END) AS homepods, sum(CASE WHEN dev = 'other' THEN count END) AS other FROM q GROUP BY 1 ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "mac", "text": "Mac", "type": "number"},
+            {"selector": "iphone", "text": "iPhone", "type": "number"},
+            {"selector": "ipad", "text": "iPad", "type": "number"},
+            {"selector": "tv", "text": "TV", "type": "number"},
+            {"selector": "homepods", "text": "HomePods", "type": "number"},
+            {"selector": "other", "text": "Other", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "DNS queries AdGuard blocked",
+      "description": "Share of the hour's queries that hit a block list: trackers and ads the devices tried to reach.",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "decimals": 1, "min": 0, "color": {"mode": "fixed", "fixedColor": "#e66767"}, "custom": {"lineWidth": 2, "spanNulls": true}},
+        "overrides": []
+      },
+      "options": {"legend": {"displayMode": "hidden"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT from_ts AS time, 100.0 * sum(CASE WHEN reason LIKE 'Filtered%' THEN count ELSE 0 END) / sum(count) AS blocked FROM dns_query WHERE from_ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND from_ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY GROUP BY 1 ORDER BY 1"},
+          "columns": [
+            {"selector": "time", "text": "time", "type": "timestamp"},
+            {"selector": "blocked", "text": "Blocked", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Sites resolved most in this range",
+      "description": "DNS queries grouped by the last two labels of the name, with how many devices asked.",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 10},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto"}}, "overrides": [{"matcher": {"id": "byName", "options": "Queries"}, "properties": [{"id": "custom.width", "value": 110}]}, {"matcher": {"id": "byName", "options": "Devices"}, "properties": [{"id": "custom.width", "value": 90}]}]},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "Queries", "desc": true}]},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT regexp_extract(domain, '([^.]+\\.[^.]+)$', 1) AS site, sum(count) AS queries, count(DISTINCT client_ip) AS devices, 100.0 * sum(CASE WHEN reason LIKE 'Filtered%' THEN count ELSE 0 END) / sum(count) AS blocked FROM dns_query WHERE from_ts >= TIMESTAMP '${__from:date:YYYY-MM-DD}' AND from_ts < TIMESTAMP '${__to:date:YYYY-MM-DD}' + INTERVAL 1 DAY GROUP BY 1 ORDER BY 2 DESC LIMIT 30"},
+          "columns": [
+            {"selector": "site", "text": "Site", "type": "string"},
+            {"selector": "queries", "text": "Queries", "type": "number"},
+            {"selector": "devices", "text": "Devices", "type": "number"},
+            {"selector": "blocked", "text": "Blocked %", "type": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Devices right now",
+      "description": "The last push: every client, its band, signal and link rates.",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 10},
+      "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto"}}, "overrides": []},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "Signal", "desc": true}]},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "yesoreyeram-infinity-datasource", "uid": "personal"},
+          "type": "json", "source": "url", "format": "table", "parser": "backend", "url": "/sql",
+          "url_options": {"method": "POST", "body_type": "raw", "body_content_type": "text/plain",
+            "data": "SELECT name, CASE radio WHEN 'na' THEN '5 GHz' WHEN 'ng' THEN '2.4 GHz' ELSE 'wired' END AS band, signal_dbm AS signal, tx_rate_kbps / 1000 AS down_mbps, rx_rate_kbps / 1000 AS up_mbps FROM wifi_client WHERE ts = (SELECT max(ts) FROM wifi_client) ORDER BY is_wired, signal_dbm DESC"},
+          "columns": [
+            {"selector": "name", "text": "Device", "type": "string"},
+            {"selector": "band", "text": "Band", "type": "string"},
+            {"selector": "signal", "text": "Signal", "type": "number"},
+            {"selector": "down_mbps", "text": "Down Mbit/s", "type": "number"},
+            {"selector": "up_mbps", "text": "Up Mbit/s", "type": "number"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.min.js"></script>
+<style>
+  /* Layout: a full-screen map; on a phone, bars at the top and sheets at the bottom; from 760 px, panels on the left. */
+  :root {
+    --ink: #15191E; --muted: #59636E; --line: #DDE1E6; --soft: #F1F3F5; --panel: #FFFFFF;
+    --accent: #0B6B53; --accent-ink: #08523F; --accent-soft: #E7F2EE; --on-accent: #FFFFFF;
+    --danger: #B42318; --blue: #1A73E8; --nav: #0B4F3E; --nav-2: #08392D;
+    --path: #15803D; --lane: #84CC16; --quiet: #2563EB; --busy: #EA580C;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.16); --font: "Atkinson Hyperlegible", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #E8EAED; --muted: #A7B0BA; --line: #3A4047; --soft: #2A2F35; --panel: #1E2227;
+      --accent: #2F9E7C; --accent-ink: #8FE0C0; --accent-soft: #163A30; --on-accent: #FFFFFF;
+      --shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    }
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 16px/1.35 var(--font); color: var(--ink); background: var(--soft); }
+  #map { position: fixed; inset: 0; }
+  .leaflet-container { font: inherit; }
+  button, input, select { font: inherit; color: inherit; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .muted { color: var(--muted); font-size: 14px; }
+  .ui { position: fixed; z-index: 1000; }
+
+  .icon { width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+          display: grid; place-items: center; cursor: pointer; }
+  .icon:hover { background: var(--soft); }
+  .icon.accent { background: var(--accent); color: var(--on-accent); width: 48px; height: 48px; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  #searchbar { top: calc(10px + env(safe-area-inset-top)); left: 10px; right: 10px; display: flex; align-items: center; gap: 2px;
+               background: var(--panel); border-radius: 28px; padding: 4px 4px 4px 14px; box-shadow: var(--shadow); }
+  #searchbar.has-back { padding-left: 4px; }
+  #searchbar input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; padding: 11px 4px; }
+  #searchbar .lead { color: var(--muted); display: grid; }
+
+  #suggest { background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; z-index: 1100;
+             max-height: 60vh; overflow-y: auto; }
+  #suggest button { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; border: 0; background: var(--panel);
+                    padding: 11px 14px; cursor: pointer; border-bottom: 1px solid var(--soft); }
+  #suggest button:hover, #suggest button:focus-visible { background: var(--soft); }
+  #suggest .t { font-weight: 700; display: block; }
+  #suggest .s { font-size: 13px; color: var(--muted); display: block; }
+
+  #dirbar { top: 0; left: 0; right: 0; background: var(--panel); box-shadow: var(--shadow);
+            padding: calc(8px + env(safe-area-inset-top)) 10px 10px; display: grid; gap: 10px; }
+  .dir-row { display: flex; gap: 6px; align-items: center; }
+  .dir-fields { flex: 1; display: grid; gap: 6px; min-width: 0; }
+  .field { display: flex; align-items: center; gap: 10px; background: var(--soft); border-radius: 10px; padding: 0 12px; }
+  .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; padding: 10px 0; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-sizing: border-box; }
+  .dot.start { border: 3px solid var(--accent); }
+  .dot.end { background: #C42B1C; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .chip { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--panel);
+          white-space: nowrap; cursor: pointer; font-size: 15px; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .seg-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+  .seg-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; display: block; }
+  .seg { display: flex; background: var(--soft); border-radius: 10px; padding: 3px; }
+  .seg button { flex: 1; height: 32px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--accent-ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .when { height: 38px; border: 0; border-radius: 10px; background: var(--soft); padding: 0 8px; font-size: 14px; min-width: 0; width: 100%; box-sizing: border-box; }
+
+  .sheet { left: 0; right: 0; bottom: 0; background: var(--panel); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(0,0,0,0.14);
+           max-height: 58vh; overflow-y: auto; padding: 0 18px calc(20px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+  .sheet.collapsed { max-height: 132px; overflow: hidden; }
+  .handle { display: block; width: 100%; height: 22px; border: 0; background: transparent; cursor: pointer; position: sticky; top: 0; z-index: 1; }
+  .handle::before { content: ""; display: block; margin: 8px auto 0; width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+  .sheet-body { display: grid; gap: 14px; }
+  .sheet h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+  .sheet h3 { margin: 4px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn { height: 46px; padding: 0 20px; border-radius: 23px; border: 1px solid var(--line); background: var(--panel); font-weight: 700;
+         cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .btn.grow { flex: 1; }
+  .links { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15px; }
+  .links a { color: var(--accent-ink); }
+  .status { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700;
+            border-radius: 14px; padding: 4px 10px; }
+  .estimate { display: flex; gap: 14px; align-items: center; background: #ECF6FA; color: #0B4F61; border-radius: 14px; padding: 12px 14px; }
+  @media (prefers-color-scheme: dark) { .estimate { background: #13313A; color: #9EDCEB; } }
+  .estimate .big { font-size: 22px; font-weight: 700; }
+  .estimate .why { font-size: 13px; opacity: 0.9; }
+  .details { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 14px; }
+  .details dt { color: var(--muted); }
+  .details dd { margin: 0; overflow-wrap: anywhere; }
+  .big-time { font-size: 28px; font-weight: 700; }
+  .alt { flex: 1; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-size: 14px; }
+  .alt[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+  .kinds { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; }
+  .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .trip { display: grid; gap: 8px; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 12px 14px; cursor: pointer; width: 100%; }
+  .trip[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); }
+  .trip .top { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; }
+  .legs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .leg { padding: 3px 8px; border-radius: 6px; font-weight: 700; background: var(--soft); }
+  .leg.bike { background: var(--accent-soft); color: var(--accent-ink); }
+  .live { margin-left: auto; color: #15803D; font-weight: 700; }
+
+  #fabs { right: 14px; bottom: calc(26px + env(safe-area-inset-bottom)); display: grid; gap: 12px; }
+  .fab { width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--panel); color: var(--ink); box-shadow: var(--shadow);
+         display: grid; place-items: center; cursor: pointer; }
+  #fab-locate { color: var(--blue); }
+
+  .switch-row { display: flex; align-items: center; justify-content: space-between; min-height: 44px; gap: 12px; }
+  .switch { width: 46px; height: 28px; flex: none; border-radius: 14px; border: 0; background: var(--line); position: relative; cursor: pointer; padding: 0; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: left 0.15s; }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch[aria-checked="true"]::after { left: 21px; }
+  .sub { margin-left: 16px; }
+  .linkish { border: 0; background: none; color: var(--accent-ink); cursor: pointer; padding: 0; font-size: 14px; }
+  .bases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .base { display: grid; gap: 6px; justify-items: center; border: 0; background: none; cursor: pointer; padding: 0; font-size: 14px; }
+  .base span:first-child { width: 100%; height: 56px; border-radius: 12px; border: 1px solid var(--line); box-sizing: border-box; }
+  .base[aria-pressed="true"] span:first-child { border: 3px solid var(--accent); }
+  .base[aria-pressed="true"] { color: var(--accent-ink); font-weight: 700; }
+  .group { display: grid; gap: 2px; border-top: 1px solid var(--soft); padding-top: 8px; }
+  .ams-active { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ams-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 16px; border: 0;
+              background: var(--soft); cursor: pointer; font-size: 14px; font-weight: 700; }
+  .ams-list details summary { cursor: pointer; padding: 6px 0; }
+  .ams-list label { display: flex; gap: 8px; align-items: center; padding: 3px 0 3px 14px; font-size: 14px; }
+
+  #nav-top { top: calc(10px + env(safe-area-inset-top)); left: 10px; right: 10px; background: var(--nav); color: #fff; border-radius: 18px;
+             box-shadow: 0 4px 16px rgba(0,0,0,0.3); padding: 14px 16px; display: flex; gap: 14px; align-items: center; }
+  .nav-dist { font-size: 32px; font-weight: 700; line-height: 1; }
+  .nav-text { font-size: 20px; line-height: 1.25; }
+  #nav-then { top: calc(122px + env(safe-area-inset-top)); left: 10px; background: var(--nav-2); color: #fff; border-radius: 12px;
+              padding: 8px 12px; font-size: 15px; display: flex; gap: 8px; align-items: center; box-shadow: var(--shadow); }
+  #nav-bottom { left: 0; right: 0; bottom: 0; background: var(--panel); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(0,0,0,0.14);
+                padding: 16px 20px calc(18px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; }
+  #nav-bottom .grow { flex: 1; }
+  .nav-eta { font-size: 26px; font-weight: 700; color: var(--accent); }
+  body.navigating #searchbar, body.navigating #dirbar, body.navigating #panel, body.navigating #layers, body.navigating #fab-layers,
+  body.navigating #suggest { display: none !important; }
+  body.navigating #fabs { bottom: calc(110px + env(safe-area-inset-bottom)); }
+
+  @media (max-width: 759px) {
+    body.sheet-open #fabs { display: none; }
+  }
+  @media (min-width: 760px) {
+    #searchbar { right: auto; width: 400px; left: 16px; top: 16px; }
+    #dirbar { left: 16px; right: auto; top: 16px; width: 400px; border-radius: 16px; box-sizing: border-box; padding-top: 10px; }
+    .sheet { left: 16px; right: auto; width: 400px; bottom: auto; top: var(--panel-top, 84px); border-radius: 16px;
+             max-height: calc(100vh - var(--panel-top, 84px) - 16px); padding-bottom: 18px; }
+    .sheet.collapsed { max-height: calc(100vh - var(--panel-top, 84px) - 16px); overflow-y: auto; }
+    .sheet .handle { display: none; }
+    .sheet-body { padding-top: 16px; }
+    #layers { left: auto; right: 16px; top: 16px; max-height: calc(100vh - 32px); }
+    #nav-top { left: 50%; right: auto; width: 440px; transform: translateX(-50%); }
+    #nav-then { left: calc(50% - 220px); }
+    #nav-bottom { left: 50%; right: auto; width: 440px; transform: translateX(-50%); bottom: 16px; border-radius: 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="searchbar" class="ui">
+  <button class="icon" id="search-back" aria-label="Back" hidden></button>
+  <span class="lead" id="search-lead"></span>
+  <input id="search" type="search" placeholder="Search places or addresses" autocomplete="off" aria-label="Search places or addresses">
+  <button class="icon" id="search-clear" aria-label="Clear search" hidden></button>
+  <button class="icon accent" id="search-dir" aria-label="Directions"></button>
+</div>
+<div id="suggest" class="ui" role="listbox" hidden></div>
+
+<div id="dirbar" class="ui" hidden>
+  <div class="dir-row">
+    <button class="icon" id="dir-back" aria-label="Back"></button>
+    <div class="dir-fields">
+      <label class="field"><span class="dot start"></span><span class="sr">From</span><input id="dir-from" autocomplete="off" placeholder="From"></label>
+      <label class="field"><span class="dot end"></span><span class="sr">To</span><input id="dir-to" autocomplete="off" placeholder="Where to?"></label>
+    </div>
+    <button class="icon" id="dir-swap" aria-label="Swap from and to"></button>
+  </div>
+  <div class="chips" id="modes" role="group" aria-label="Travel mode"></div>
+  <div class="seg-row" id="transit-opts" hidden>
+    <div><span class="seg-label">Start by</span><div class="seg" id="seg-start" role="group" aria-label="Start by"></div></div>
+    <div><span class="seg-label">End by</span><div class="seg" id="seg-end" role="group" aria-label="End by"></div></div>
+    <label><span class="seg-label">Leave</span><input class="when" id="dir-when" type="datetime-local" aria-label="Leave at (empty: now)"></label>
+  </div>
+</div>
+
+<section id="panel" class="ui sheet" hidden aria-live="polite">
+  <button class="handle" id="panel-handle" aria-label="Expand or collapse"></button>
+  <div class="sheet-body" id="panel-body"></div>
+</section>
+
+<section id="layers" class="ui sheet" hidden aria-label="Layers">
+  <button class="handle" id="layers-handle" aria-label="Expand or collapse"></button>
+  <div class="sheet-body" id="layers-body"></div>
+</section>
+
+<div id="fabs" class="ui">
+  <button class="fab" id="fab-layers" aria-label="Layers"></button>
+  <button class="fab" id="fab-locate" aria-label="Show my location"></button>
+</div>
+
+<div id="nav-top" class="ui" hidden>
+  <span id="nav-icon"></span>
+  <div><div class="nav-dist" id="nav-dist"></div><div class="nav-text" id="nav-text"></div></div>
+</div>
+<div id="nav-then" class="ui" hidden></div>
+<div id="nav-bottom" class="ui" hidden>
+  <div class="grow"><div class="nav-eta" id="nav-eta"></div><div class="muted" id="nav-left"></div></div>
+  <button class="btn" id="nav-reroute" hidden>Reroute</button>
+  <button class="btn danger" id="nav-stop">Stop</button>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------------------------------------------------
+// Basics
+const HOME = [0, 0]; // web.py fills in HOME_LAT and HOME_LON
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const e = Object.assign(document.createElement(tag), props);
+  for (const k of kids) if (k !== null && k !== undefined && k !== false && k !== "") e.append(k);
+  return e;
+};
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+};
+const SVGNS = "http://www.w3.org/2000/svg";
+const ICONS = {
+  search: [["circle", { cx: 11, cy: 11, r: 7 }], ["path", { d: "M20 20l-4-4" }]],
+  back: [["path", { d: "M15 5l-7 7 7 7" }]],
+  close: [["path", { d: "M6 6l12 12M18 6L6 18" }]],
+  directions: [["path", { d: "M12 2.5l9.5 9.5-9.5 9.5L2.5 12z" }], ["path", { d: "M9 15v-3.5h6M13 9l2 2.5-2 2.5" }]],
+  layers: [["path", { d: "M12 3l9 5-9 5-9-5z" }], ["path", { d: "M3 13l9 5 9-5" }]],
+  locate: [["circle", { cx: 12, cy: 12, r: 7 }], ["circle", { cx: 12, cy: 12, r: 2.5, fill: "currentColor" }], ["path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3" }]],
+  swap: [["path", { d: "M8 4v16M8 20l-3-3M8 20l3-3M16 20V4M16 4l-3 3M16 4l3 3" }]],
+  start: [["path", { d: "M12 2l7 19-7-4-7 4z", fill: "currentColor" }]],
+  right: [["path", { d: "M7 21v-8a3 3 0 013-3h9" }], ["path", { d: "M15 6l4 4-4 4" }]],
+  left: [["path", { d: "M17 21v-8a3 3 0 00-3-3H5" }], ["path", { d: "M9 6l-4 4 4 4" }]],
+  straight: [["path", { d: "M12 21V4M6 10l6-6 6 6" }]],
+  uturn: [["path", { d: "M8 21V9a5 5 0 0110 0v4" }], ["path", { d: "M14 10l4 4 4-4" }]],
+  flag: [["path", { d: "M5 21V4h11l-2 4 2 4H5" }]],
+  train: [["rect", { x: 6, y: 3, width: 12, height: 13, rx: 3 }], ["path", { d: "M6 10h12M9 20l-1.5 2M15 20l1.5 2" }]],
+  water: [["path", { d: "M3 9c3-2 6 2 9 0s6 2 9 0M3 15c3-2 6 2 9 0s6 2 9 0" }]],
+  pin: [["path", { d: "M12 21s-7-7-7-12a7 7 0 0114 0c0 5-7 12-7 12z" }], ["circle", { cx: 12, cy: 9, r: 2.5 }]],
+  copy: [["rect", { x: 8, y: 8, width: 12, height: 12, rx: 2 }], ["path", { d: "M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" }]],
+  clock: [["circle", { cx: 12, cy: 12, r: 8.5 }], ["path", { d: "M12 7v5l3 2" }]],
+  home: [["path", { d: "M4 20V9l8-5 8 5v11z" }], ["path", { d: "M10 20v-6h4v6" }]],
+};
+function icon(name, size = 22) {
+  const s = document.createElementNS(SVGNS, "svg");
+  for (const [k, v] of Object.entries({ viewBox: "0 0 24 24", width: size, height: size, fill: "none", stroke: "currentColor",
+    "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" })) s.setAttribute(k, v);
+  for (const [tag, attrs] of ICONS[name] || []) {
+    const c = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs)) c.setAttribute(k, v);
+    s.append(c);
+  }
+  return s;
+}
+for (const [id, name] of [["search-back", "back"], ["search-lead", "search"], ["search-clear", "close"], ["search-dir", "directions"],
+  ["dir-back", "back"], ["dir-swap", "swap"], ["fab-layers", "layers"], ["fab-locate", "locate"]]) $(id).append(icon(name, id.startsWith("fab") ? 24 : 22));
+
+const hhmm = d => new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const metres = d => d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.max(10, Math.round(d / 10) * 10)} m`;
+const minutes = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.max(1, Math.round(s / 60))} min`;
+const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The map and its base layers
+const map = L.map("map", { zoomControl: false }).setView(HOME, 13);
+if (matchMedia("(min-width: 760px)").matches) L.control.zoom({ position: "topright" }).addTo(map);
+const BASES = {
+  map: { name: "Map", swatch: "#EEEBE4", layer: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }) },
+  light: { name: "Light", swatch: "#F4F4F2", layer: L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors © CARTO" }) },
+  aerial: { name: "Aerial", swatch: "#5F6B4E", layer: L.tileLayer("https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg", { maxZoom: 19, maxNativeZoom: 19, attribution: "PDOK luchtfoto (Netherlands only)" }) },
+};
+let base = BASES[store.get("base", "map")] ? store.get("base", "map") : "map";
+BASES[base].layer.addTo(map);
+function setBase(key) {
+  map.removeLayer(BASES[base].layer);
+  base = key;
+  BASES[key].layer.addTo(map).bringToBack();
+  store.set("base", key);
+}
+L.circleMarker(HOME, { radius: 7, color: "#fff", weight: 3, fillColor: "#0B6B53", fillOpacity: 1 }).bindTooltip("Home").addTo(map);
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sheets and modes: browse, place, directions, navigate
+let mode = "browse";
+const panel = $("panel"), panelBody = $("panel-body"), layersSheet = $("layers");
+function showPanel(...content) {
+  panelBody.replaceChildren(...content);
+  panel.hidden = false;
+  panel.classList.remove("collapsed");
+  panel.scrollTop = 0;
+  layersSheet.hidden = true;
+  document.body.classList.add("sheet-open");
+  placePanel();
+}
+function hidePanel() {
+  panel.hidden = true;
+  document.body.classList.toggle("sheet-open", !layersSheet.hidden);
+}
+$("panel-handle").onclick = () => panel.classList.toggle("collapsed");
+$("layers-handle").onclick = () => layersSheet.classList.toggle("collapsed");
+// On a wide screen the panel sits under whichever bar is showing.
+function placePanel() {
+  const bar = mode === "directions" ? $("dirbar") : $("searchbar");
+  document.documentElement.style.setProperty("--panel-top", `${bar.getBoundingClientRect().bottom + 10}px`);
+}
+new ResizeObserver(placePanel).observe($("dirbar"));
+addEventListener("resize", placePanel);
+
+function setMode(next) {
+  mode = next;
+  $("searchbar").hidden = next === "directions";
+  $("dirbar").hidden = next !== "directions";
+  const back = next === "place";
+  $("search-back").hidden = !back;
+  $("search-lead").hidden = back;
+  $("searchbar").classList.toggle("has-back", back);
+  document.body.classList.toggle("navigating", next === "navigate");
+  placePanel();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Search: Dutch addresses from PDOK, everything else from Photon (OpenStreetMap), as you type
+const here = { latlng: null, marker: null, ring: null };
+// Words for kinds of places, English and Dutch, and the OpenStreetMap tags that mark them.
+const CATEGORIES = [
+  [["coffee", "cafe", "café", "koffie", "coffee shop"], '["amenity"="cafe"]', "Café"],
+  [["restaurant", "restaurants", "eten", "dinner", "lunch"], '["amenity"="restaurant"]', "Restaurant"],
+  [["bar", "pub", "kroeg", "bars", "beer", "bier"], '["amenity"~"^(bar|pub)$"]', "Bar"],
+  [["supermarket", "supermarkt", "groceries", "boodschappen"], '["shop"="supermarket"]', "Supermarket"],
+  [["bakery", "bakker", "bread", "brood"], '["shop"="bakery"]', "Bakery"],
+  [["pharmacy", "apotheek", "chemist", "drogist"], '["amenity"="pharmacy"]', "Pharmacy"],
+  [["atm", "cash", "pinautomaat", "geldautomaat"], '["amenity"="atm"]', "ATM"],
+  [["bike shop", "bike repair", "fietsenmaker", "fietsenwinkel", "fietsreparatie", "bicycle shop"], '["shop"="bicycle"]', "Bike shop"],
+  [["bike parking", "fietsenstalling", "stalling"], '["amenity"="bicycle_parking"]', "Bike parking"],
+  [["ov-fiets", "ov fiets", "bike rental", "fietsverhuur"], '["amenity"="bicycle_rental"]', "Bike rental"],
+  [["toilet", "toilets", "wc", "toilet near me"], '["amenity"="toilets"]', "Toilets"],
+  [["drinking water", "water tap", "watertappunt", "kraanwater"], '["amenity"="drinking_water"]', "Drinking water"],
+  [["ice cream", "ijs", "ijssalon", "gelato"], '["amenity"="ice_cream"]', "Ice cream"],
+  [["takeaway", "fast food", "snackbar", "friet", "fries"], '["amenity"="fast_food"]', "Fast food"],
+  [["doctor", "gp", "huisarts"], '["amenity"="doctors"]', "Doctor"],
+  [["hospital", "ziekenhuis"], '["amenity"="hospital"]', "Hospital"],
+  [["library", "bibliotheek"], '["amenity"="library"]', "Library"],
+  [["cinema", "bioscoop", "movies"], '["amenity"="cinema"]', "Cinema"],
+  [["gym", "sportschool", "fitness"], '["leisure"="fitness_centre"]', "Gym"],
+  [["climbing", "bouldering", "klimhal", "boulderhal"], '["sport"~"climbing"]', "Climbing"],
+  [["swimming pool", "zwembad", "pool"], '["leisure"="swimming_pool"]["access"!="private"]', "Swimming pool"],
+  [["park", "parks"], '["leisure"="park"]', "Park"],
+  [["playground", "speeltuin"], '["leisure"="playground"]', "Playground"],
+  [["hardware", "bouwmarkt", "diy", "ijzerwaren"], '["shop"~"^(hardware|doityourself)$"]', "Hardware"],
+  [["charging", "laadpaal", "ev charging"], '["amenity"="charging_station"]', "Charging"],
+  [["station", "train station", "treinstation"], '["railway"="station"]', "Station"],
+  [["post office", "postnl", "pakketpunt", "post"], '["amenity"~"^(post_office|parcel_locker)$"]', "Post"],
+];
+// Public Overpass servers, tried in turn: each is often at capacity.
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+const KIND_NAMES = { cafe: "Café", restaurant: "Restaurant", bar: "Bar", pub: "Pub", supermarket: "Supermarket", bakery: "Bakery",
+  pharmacy: "Pharmacy", bicycle: "Bike shop", fast_food: "Fast food", department_store: "Department store", sports_centre: "Sports centre",
+  fitness_centre: "Gym", clothes: "Clothes shop", convenience: "Shop", ice_cream: "Ice cream" };
+const kindName = v => KIND_NAMES[v] || (v ? v.replaceAll("_", " ").replace(/^./, c => c.toUpperCase()) : "");
+const address = t => [[t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(" "), t["addr:city"]].filter(Boolean).join(", ");
+const searchCentre = () => here.latlng ? L.latLng(here.latlng) : map.getCenter();
+// Lower case without accents, for comparing names.
+const fold = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+async function overpass(query) {
+  let last;
+  for (const server of OVERPASS) {
+    try {
+      const r = await fetch(server, { method: "POST", body: new URLSearchParams({ data: `[out:json][timeout:20];${query}` }), signal: AbortSignal.timeout(6000) });
+      if (r.ok) return (await r.json()).elements;
+      last = new Error(`Overpass ${r.status}`);
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+const elementLatLng = e => e.center ? [e.center.lat, e.center.lon] : [e.lat, e.lon];
+
+async function nearby(words, filter, label) {
+  const c = searchCentre();
+  try {
+    for (const radius of [3000, 15000]) {
+      const els = (await overpass(`nwr${filter}(around:${radius},${c.lat},${c.lng});out tags center 60;`)).filter(e => e.tags);
+      if (els.length >= 3 || radius === 15000) {
+        return els.map(e => ({ e, d: c.distanceTo(elementLatLng(e)) })).sort((a, b) => a.d - b.d).slice(0, 12).map(({ e, d }) => ({
+          title: e.tags.name || e.tags.brand || label, sub: [label, metres(d), address(e.tags)].filter(Boolean).join(" · "),
+          latlng: elementLatLng(e), tags: e.tags, icon: "pin" }));
+      }
+    }
+  } catch {
+    // Overpass busy: Photon's tag filter, which only finds places with the word in their name.
+    const [, key, value] = filter.match(/\["(\w+)"[=~]"\^?\(?([\w]+)/) || [];
+    const bbox = [c.lng - 0.2, c.lat - 0.12, c.lng + 0.2, c.lat + 0.12].map(v => v.toFixed(4)).join(",");
+    const j = await (await fetch(`https://photon.komoot.io/api/?limit=20&lang=en&lat=${c.lat}&lon=${c.lng}&bbox=${bbox}&osm_tag=${key}:${value}&q=${encodeURIComponent(words[0])}`)).json();
+    return j.features.map(f => ({ f, at: [f.geometry.coordinates[1], f.geometry.coordinates[0]] })).map(({ f, at }) => ({ f, at, d: c.distanceTo(at) }))
+      .sort((a, b) => a.d - b.d).slice(0, 12).map(({ f, at, d }) => {
+        const p = f.properties;
+        return { title: p.name || label, sub: [label, metres(d), [p.street, p.housenumber].filter(Boolean).join(" ")].filter(Boolean).join(" · "),
+          latlng: at, osm: `${{ N: "node", W: "way", R: "relation" }[p.osm_type]}(${p.osm_id})`, icon: "pin" };
+      });
+  }
+  return [];
+}
+
+async function searchPlaces(q) {
+  const lower = q.toLowerCase().replace(/\s+(near me|nearby|in de buurt)$/, "").trim();
+  const category = CATEGORIES.find(([words]) => words.includes(lower));
+  if (category) return nearby(...category).catch(() => []);
+  const c = searchCentre();
+  // Around where you are looking: a box of about 60 km.
+  const bbox = [c.lng - 0.45, c.lat - 0.27, c.lng + 0.45, c.lat + 0.27].map(v => v.toFixed(4)).join(",");
+  const photon = (extra, limit) => fetch(`https://photon.komoot.io/api/?limit=${limit}&lang=en&lat=${c.lat}&lon=${c.lng}${extra}&q=${encodeURIComponent(q)}`)
+    .then(r => r.json()).then(j => j.features.map(f => {
+      const p = f.properties, at = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+      const poi = ["amenity", "shop", "leisure", "tourism", "office", "craft", "healthcare", "sport", "club"].includes(p.osm_key);
+      return { title: p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || p.city || q,
+        sub: [poi ? kindName(p.osm_value) : p.osm_value, metres(c.distanceTo(at)), [[p.street, p.housenumber].filter(Boolean).join(" "), p.city, p.country === "Nederland" ? "" : p.country].filter(Boolean).join(", ")].filter(Boolean).join(" · "),
+        latlng: at, poi, osm: p.osm_type && p.osm_id ? `${{ N: "node", W: "way", R: "relation" }[p.osm_type]}(${p.osm_id})` : null, d: c.distanceTo(at) };
+    })).catch(() => []);
+  const [local, world, pdok] = await Promise.all([
+    photon(`&bbox=${bbox}`, 12), photon("", 5),
+    fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?rows=5&fl=weergavenaam,centroide_ll,type&lat=${c.lat}&lon=${c.lng}&q=${encodeURIComponent(q)}`)
+      .then(r => r.json()).then(j => j.response.docs.map(d => {
+        const [lon, lat] = d.centroide_ll.match(/POINT\(([-\d.]+) ([-\d.]+)\)/).slice(1).map(Number);
+        const [title, ...rest] = d.weergavenaam.split(", ");
+        return { title, full: d.weergavenaam, sub: [d.type, metres(c.distanceTo([lat, lon])), rest.join(", ")].filter(Boolean).join(" · "), latlng: [lat, lon] };
+      // PDOK answers almost anything with something: keep addresses holding every word typed.
+      })).then(ps => ps.filter(p => fold(q).split(/\s+/).every(w => fold(p.full).includes(w)))).catch(() => []),
+  ]);
+  // Nearby places whose name matches come first: the name itself, then names starting with it, then containing it; businesses
+  // before other things, nearest first. Then addresses (first if the query has a number), then the rest.
+  const match = p => { const t = fold(p.title).replace(/^(de|het|the) /, ""); return t === fold(lower) ? 0 : t.startsWith(fold(lower)) ? 1 : 2; };
+  const named = local.filter(p => fold(p.title).includes(fold(lower))).sort((a, b) => (match(a) - match(b)) || (b.poi - a.poi) || (a.d - b.d));
+  const other = local.filter(p => !named.includes(p));
+  const addressLike = /\d/.test(q);
+  const ordered = addressLike ? [...pdok, ...named, ...other, ...world] : [...named, ...pdok, ...other, ...world];
+  const seen = new Set();
+  return ordered.filter(p => {
+    const key = `${p.title.toLowerCase()}|${p.latlng[0].toFixed(3)},${p.latlng[1].toFixed(3)}`;
+    if (!p.title || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 10);
+}
+
+// Opening hours, website and the like for a business, from its OpenStreetMap tags.
+function poiInfo(p) {
+  const box = el("div", { className: "details-box" });
+  const render = t => {
+    const rows = [];
+    if (t.opening_hours) rows.push(["Opening hours", el("span", { style: "white-space:pre-line", textContent: t.opening_hours.split(/;\s*/).join("\n") })]);
+    const site = t.website || t["contact:website"];
+    if (site && /^https?:\/\//.test(site)) rows.push(["Website", el("a", { href: site, target: "_blank", rel: "noopener", textContent: site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") })]);
+    const phone = t.phone || t["contact:phone"];
+    if (phone) rows.push(["Phone", el("a", { href: `tel:${phone.replace(/\s/g, "")}`, textContent: phone })]);
+    if (address(t)) rows.push(["Address", address(t)]);
+    if (t.cuisine) rows.push(["Cuisine", t.cuisine.replaceAll(";", ", ").replaceAll("_", " ")]);
+    if (t.wheelchair) rows.push(["Wheelchair", t.wheelchair]);
+    box.replaceChildren(...(rows.length ? [el("dl", { className: "details" }, ...rows.flatMap(([k, v]) => [el("dt", { textContent: k }), el("dd", {}, v)]))] : []));
+  };
+  if (p.tags) render(p.tags);
+  else if (p.osm) overpass(`${p.osm};out tags center;`).then(els => { if (els[0]?.tags) render(els[0].tags); }).catch(() => {});
+  return box;
+}
+
+const suggest = $("suggest");
+let suggestFor = null, suggestTimer = null, suggestSeq = 0;
+function showSuggestions(input, items) {
+  if (document.activeElement !== input) return;
+  const r = input.closest(".field, #searchbar").getBoundingClientRect();
+  Object.assign(suggest.style, { top: `${r.bottom + 6}px`, left: `${r.left}px`, width: `${Math.max(r.width, 280)}px` });
+  suggest.replaceChildren(...items.map(p => {
+    const b = el("button", { type: "button" }, icon(p.icon || "pin", 20), el("span", {}, el("span", { className: "t", textContent: p.title }), el("span", { className: "s", textContent: p.sub || "" })));
+    b.setAttribute("role", "option");
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => { suggest.hidden = true; input.value = p.title; input._place = p; suggestFor.pick(p); };
+    return b;
+  }));
+  suggest.hidden = !items.length;
+}
+function quickPicks() {
+  return [{ title: "Home", sub: "Your home", latlng: HOME, icon: "home" }, { title: "Your location", sub: "Where you are now", here: true, icon: "locate" }];
+}
+function attachSuggest(input, pick) {
+  input.addEventListener("focus", () => { suggestFor = { input, pick }; if (!input.value.trim()) showSuggestions(input, quickPicks()); });
+  input.addEventListener("blur", () => setTimeout(() => { if (suggestFor?.input === input) suggest.hidden = true; }, 150));
+  input.addEventListener("keydown", e => { if (e.key === "Escape") suggest.hidden = true; });
+  input.addEventListener("input", () => {
+    input._place = null;
+    suggestFor = { input, pick };
+    clearTimeout(suggestTimer);
+    const q = input.value.trim();
+    if (!q) { showSuggestions(input, quickPicks()); return; }
+    if (q.length < 3) return;
+    const seq = ++suggestSeq;
+    suggestTimer = setTimeout(async () => {
+      const items = await searchPlaces(q);
+      if (seq === suggestSeq) showSuggestions(input, items);
+    }, 250);
+  });
+}
+
+async function locate() {
+  const p = await new Promise((ok, fail) => navigator.geolocation.getCurrentPosition(ok, fail, { enableHighAccuracy: true, timeout: 12000 }));
+  here.latlng = [p.coords.latitude, p.coords.longitude];
+  here.ring = (here.ring || L.circle(here.latlng, { radius: 1, color: "#1A73E8", weight: 1, fillOpacity: 0.12 }).addTo(map)).setLatLng(here.latlng).setRadius(p.coords.accuracy);
+  here.marker = (here.marker || L.circleMarker(here.latlng, { radius: 8, color: "#fff", weight: 3, fillColor: "#1A73E8", fillOpacity: 1 }).addTo(map)).setLatLng(here.latlng);
+  return here.latlng;
+}
+$("fab-locate").onclick = async () => {
+  if (mode === "navigate") { nav.follow = true; return; }
+  try { map.setView(await locate(), Math.max(map.getZoom(), 16)); } catch (e) { toast(`Couldn't get your location: ${e.message}`); }
+};
+function toast(text) { showPanel(el("p", { className: "muted", textContent: text })); }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Places: a search result, a dropped pin or anything tapped on a layer
+let placeMarker = null;
+function openPlace(p) {
+  setMode("place");
+  $("search").value = p.title;
+  $("search-clear").hidden = false;
+  if (placeMarker) map.removeLayer(placeMarker);
+  placeMarker = L.marker(p.latlng).addTo(map);
+  if (p.fly !== false) map.setView(p.latlng, Math.max(map.getZoom(), 15));
+  const [lat, lon] = p.latlng;
+  const copy = el("button", { className: "icon", type: "button", ariaLabel: "Copy coordinates" }, icon("copy", 20));
+  copy.setAttribute("aria-label", "Copy coordinates");
+  copy.onclick = () => navigator.clipboard?.writeText(`${lat.toFixed(6)}, ${lon.toFixed(6)}`).catch(() => {});
+  const to = el("button", { className: "btn primary grow", type: "button" }, icon("directions", 20), "Directions");
+  to.onclick = () => openDirections({ to: p });
+  const from = el("button", { className: "btn grow", type: "button", textContent: "From here" });
+  from.onclick = () => openDirections({ from: p });
+  const details = p.details && p.details.length ? el("dl", { className: "details" }, ...p.details.flatMap(([k, v]) => [el("dt", { textContent: k }), el("dd", { textContent: String(v) })])) : null;
+  showPanel(
+    el("div", {}, el("h2", { textContent: p.title }), el("div", { className: "muted", textContent: p.sub || `${lat.toFixed(5)}, ${lon.toFixed(5)}` })),
+    p.status || null,
+    p.water ? waterEstimate(p.latlng) : null,
+    el("div", { className: "row" }, to, from, copy),
+    p.tags || p.osm ? poiInfo(p) : null,
+    details ? el("h3", { textContent: p.detailsTitle || "Details" }) : null,
+    details,
+  );
+}
+function closePlace() {
+  if (placeMarker) map.removeLayer(placeMarker);
+  placeMarker = null;
+  $("search").value = "";
+  $("search-clear").hidden = true;
+  hidePanel();
+  setMode("browse");
+}
+$("search-back").onclick = closePlace;
+$("search-clear").onclick = closePlace;
+$("search").addEventListener("input", () => { $("search-clear").hidden = !$("search").value; });
+attachSuggest($("search"), async p => {
+  if (p.here) { try { p = { title: "Your location", latlng: await locate() }; } catch { return; } }
+  openPlace(p);
+});
+$("search-dir").onclick = () => openDirections({});
+map.on("contextmenu", e => openPlace({ title: "Dropped pin", latlng: [e.latlng.lat, e.latlng.lng], fly: false }));
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Water: the best guess for a swimming spot from Rijkswaterstaat's sensors nearby
+let waterReadings = [];
+function waterEstimate(latlng) {
+  const at = L.latLng(latlng);
+  const fresh = waterReadings.filter(w => Date.now() - new Date(w.ts) < 2 * 864e5);
+  const pool = (fresh.length ? fresh : waterReadings).map(w => ({ ...w, d: at.distanceTo([w.lat, w.lon]) })).sort((a, b) => a.d - b.d);
+  if (!pool.length) return el("div", { className: "estimate" }, icon("water", 30), el("div", { className: "why", textContent: "No water temperature readings yet." }));
+  const nearest = pool[0];
+  const nearby = pool.filter(w => w.d < 20000);
+  const range = nearby.length > 1 ? ` Sensors within 20 km read ${Math.min(...nearby.map(w => w.celsius)).toFixed(1)}–${Math.max(...nearby.map(w => w.celsius)).toFixed(1)} °C.` : "";
+  return el("div", { className: "estimate" }, icon("water", 30), el("div", {},
+    el("div", { className: "big", textContent: `≈ ${nearest.celsius.toFixed(1)} °C water` }),
+    el("div", { className: "why", textContent: `From the nearest sensor, ${nearest.name} (${metres(nearest.d)}), ${ago(nearest.ts)}.${range} Lakes can differ by a few degrees.` })));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Layers: live layers, your own data and Amsterdam's open data
+const radar = L.tileLayer.wms("/map/knmi-radar", { layers: "precipitationfc", format: "image/png", transparent: true, version: "1.3.0", DATASET: "radar_forecast", opacity: 0.7, attribution: "KNMI" });
+setInterval(() => radar.setParams({ _: Date.now() }), 5 * 60e3);
+const rivm = layer => L.tileLayer.wms("https://data.rivm.nl/geo/alo/wms", { layers: layer, format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5, attribution: "RIVM Atlas Leefomgeving" });
+const NOISE = [
+  ["noise", "All sources (Lden 2022)", rivm("rivm_20250801_Geluid_lden_allebronnen_2022")],
+  ["noise-road", "Road", rivm("rivm_20250101_Geluid_lden_wegverkeer_2022")],
+  ["noise-road-night", "Road at night", rivm("rivm_20250101_Geluid_lnight_wegverkeer_2022")],
+  ["noise-air", "Aircraft", rivm("rivm_20241201_Geluid_lden_vliegverkeer_2022")],
+  ["noise-rail", "Rail", rivm("rivm_20250101_Geluid_lden_treinverkeer_2023")],
+  ["noise-rail-night", "Rail at night", rivm("rivm_20250101_Geluid_lnight_treinverkeer_2023")],
+  ["noise-industry", "Industry", rivm("rivm_20250801_Geluid_lden_industrie_2024")],
+  ["noise-wind", "Wind turbines", rivm("rivm_20240301_geluid_Lden_windturbines_2024")],
+];
+const groups = { location: L.layerGroup(), photos: L.layerGroup(), flights: L.layerGroup(), earthquakes: L.layerGroup(), swimming: L.layerGroup(), water: L.layerGroup() };
+const heat = L.heatLayer([], { radius: 12, blur: 15, minOpacity: 0.3 });
+const LAYERS = { radar, heat, ...Object.fromEntries(NOISE.map(([id, , layer]) => [id, layer])), ...groups };
+let on = new Set(store.get("layers", ["location", "swimming", "water"]));
+function setLayer(id, value) {
+  value ? map.addLayer(LAYERS[id]) : map.removeLayer(LAYERS[id]);
+  value ? on.add(id) : on.delete(id);
+  store.set("layers", [...on]);
+  if (id === "location") replayRow.hidden = !value;
+}
+let period = store.get("period", 7);
+
+async function getGeo(name, ranged) {
+  const q = ranged ? `?from=${new Date(Date.now() - period * 864e5).toISOString().slice(0, 10)}&to=${new Date(Date.now() + 864e5).toISOString().slice(0, 10)}` : "";
+  const r = await fetch(`/map/data/${name}${q}`);
+  if (r.redirected || r.status === 401) { location.href = "/login?next=/map"; throw new Error("signed out"); }
+  return (await r.json()).features;
+}
+const ll = f => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+const tap = (layer, place) => layer.on("click", e => { L.DomEvent.stop(e); openPlace(place()); });
+const props = p => Object.entries(p).filter(([, v]) => v !== null && v !== "");
+const SWIM = { goed: ["Water quality good", "#15803D", "#DCFCE7", "#14532D"], WAARSCHUWING: ["Warning", "#B45309", "#FEF3C7", "#78350F"],
+  NEGATIEF_ZWEMADVIES: ["Advice: don't swim", "#B91C1C", "#FEE2E2", "#7F1D1D"], NADER_ONDERZOEK: ["Being investigated", "#7E22CE", "#F3E8FF", "#581C87"],
+  ZWEMVERBOD: ["Swimming banned", "#7F1D1D", "#FEE2E2", "#7F1D1D"] };
+const altColour = ft => ft == null ? "#888" : ft < 2000 ? "#dc2626" : ft < 5000 ? "#f59e0b" : "#2563eb";
+let track = [];
+const LOADERS = {
+  async location(g) {
+    const fs = await getGeo("location", true);
+    track = fs;
+    const pts = fs.map(ll);
+    L.polyline(pts, { color: "#2563eb", weight: 3, opacity: 0.6 }).addTo(g);
+    heat.setLatLngs(pts);
+    replay.max = Math.max(fs.length - 1, 0);
+    replay.value = 0;
+  },
+  async photos(g) {
+    for (const f of await getGeo("photos", true)) {
+      tap(L.circleMarker(ll(f), { radius: 6, color: "#fff", weight: 2, fillColor: "#DB2777", fillOpacity: 1 }).addTo(g),
+        () => ({ title: f.properties.labels ? f.properties.labels.split(", ").slice(0, 3).join(", ") : "Photo", sub: `Photo · ${new Date(f.properties.taken_at).toLocaleString("en-GB")}`, latlng: ll(f), details: props(f.properties), detailsTitle: "Photo" }));
+    }
+  },
+  async flights(g) {
+    for (const f of await getGeo("flights", true)) {
+      tap(L.circleMarker(ll(f), { radius: 4, color: altColour(f.properties.altitude_ft), weight: 2 }).addTo(g),
+        () => ({ title: f.properties.callsign || "Aircraft", sub: `Aircraft · ${new Date(f.properties.ts).toLocaleString("en-GB")}`, latlng: ll(f), details: props(f.properties), detailsTitle: "Flight" }));
+    }
+  },
+  async earthquakes(g) {
+    for (const f of await getGeo("earthquakes", false)) {
+      const m = f.properties.magnitude ?? 0;
+      tap(L.circleMarker(ll(f), { radius: 3 + m * 3, color: "#7c2d12", weight: 1 }).addTo(g),
+        () => ({ title: `Magnitude ${m}`, sub: `${f.properties.place || "Earthquake"} · ${new Date(f.properties.ts).toLocaleDateString("en-GB")}`, latlng: ll(f), details: props(f.properties), detailsTitle: "Earthquake" }));
+    }
+  },
+  async swimming(g) {
+    for (const f of await getGeo("swimming", false)) {
+      const s = SWIM[f.properties.status] || [f.properties.status || "Unknown", "#6B7280", "#F3F4F6", "#374151"];
+      tap(L.circleMarker(ll(f), { radius: 8, color: "#fff", weight: 2, fillColor: s[1], fillOpacity: 1 }).addTo(g),
+        () => ({ title: f.properties.name, sub: "Swimming spot", latlng: ll(f), water: true,
+          status: el("span", { className: "status", style: `background:${s[2]};color:${s[3]}` }, el("span", { className: "sw", style: `background:${s[1]};border-radius:50%` }), s[0]) }));
+    }
+  },
+  async water(g) {
+    const fs = await getGeo("water", false);
+    waterReadings = fs.map(f => ({ name: f.properties.name, ts: f.properties.ts, celsius: f.properties.celsius, lat: ll(f)[0], lon: ll(f)[1] }))
+      .filter(w => w.celsius < 100);
+    for (const w of waterReadings) {
+      const stale = Date.now() - new Date(w.ts) > 2 * 864e5;
+      const label = stale ? `${w.celsius.toFixed(1)} °C (${w.ts.slice(5, 10)})` : `${w.celsius.toFixed(1)} °C`;
+      const m = L.marker([w.lat, w.lon], { icon: L.divIcon({ className: "", html: "", iconSize: null }) }).addTo(g);
+      const div = m.getElement();
+      if (div) {
+        div.replaceChildren(el("div", { textContent: label, style: `background:${stale ? "#94a3b8" : "#0E7490"};color:#fff;padding:3px 7px;border-radius:6px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)` }));
+      }
+      tap(m, () => ({ title: w.name, sub: `Water temperature · ${ago(w.ts)}`, latlng: [w.lat, w.lon], details: [["Temperature", `${w.celsius.toFixed(1)} °C`], ["Measured", new Date(w.ts).toLocaleString("en-GB")]], detailsTitle: "Rijkswaterstaat sensor" }));
+    }
+  },
+};
+async function load(names) {
+  for (const name of names) {
+    groups[name].clearLayers();
+    try { await LOADERS[name](groups[name]); } catch (e) { console.warn(name, e); }
+  }
+}
+
+// Replay: walk a dot along the loaded track.
+const you = L.circleMarker(HOME, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 });
+const replay = el("input", { type: "range", min: 0, value: 0, style: "width:100%" });
+replay.setAttribute("aria-label", "Replay where you have been");
+const replayAt = el("span", { className: "muted" });
+replay.oninput = () => {
+  const f = track[replay.value];
+  if (!f) return;
+  you.setLatLng(ll(f)).addTo(map);
+  replayAt.textContent = new Date(f.properties.ts).toLocaleString("en-GB");
+};
+const replayRow = el("div", { className: "sub" }, el("span", { className: "muted", textContent: "Replay " }), replayAt, replay);
+
+// Amsterdam: every dataset the city serves as vector tiles; a layer per table.
+const AMS = "https://api.data.amsterdam.nl/v1/mvt/";
+const AMS_COLOURS = ["#16a34a", "#ea580c", "#9333ea", "#0891b2", "#be123c", "#ca8a04", "#4f46e5", "#0d9488"];
+const amsActive = {};
+let amsDatasets = [];
+function amsToggle(key, value) {
+  if (value && !amsActive[key]) {
+    const colour = AMS_COLOURS[Object.keys(amsActive).length % AMS_COLOURS.length];
+    const style = () => ({ color: colour, fillColor: colour, fill: true, fillOpacity: 0.45, weight: 1.5, radius: 5 });
+    const layer = L.vectorGrid.protobuf(`${AMS}${key}/{z}/{x}/{y}.pbf`, { minZoom: 14, interactive: true, rendererFactory: L.canvas.tile,
+      vectorTileLayerStyles: { default: style }, attribution: "Gemeente Amsterdam" })
+      .on("click", e => {
+        L.DomEvent.stop(e);
+        const p = e.layer.properties;
+        const name = p.naam || p.name || p.soortnaamKort || p.fractieOmschrijving || key.split("/")[1];
+        openPlace({ title: String(name), sub: `Amsterdam · ${key.replace("/", " › ")}`, latlng: [e.latlng.lat, e.latlng.lng], fly: false, details: props(p), detailsTitle: "From the city" });
+      });
+    amsActive[key] = { layer: layer.addTo(map), colour };
+  }
+  if (!value && amsActive[key]) { map.removeLayer(amsActive[key].layer); delete amsActive[key]; }
+  store.set("ams", Object.keys(amsActive));
+  renderAmsActive();
+}
+async function amsTables(dataset) {
+  // The tile index lists a dataset's tables only as links on its page.
+  const html = await (await fetch(`${AMS}${dataset}/`)).text();
+  return [...new Set([...html.matchAll(new RegExp(`/v1/mvt/${dataset}/([A-Za-z0-9_]+)/`, "g"))].map(m => m[1]))];
+}
+const amsActiveBox = el("div", { className: "ams-active" });
+function renderAmsActive() {
+  amsActiveBox.replaceChildren(...Object.entries(amsActive).map(([key, { colour }]) => {
+    const b = el("button", { className: "ams-chip", type: "button" }, el("span", { className: "sw", style: `background:${colour};border-radius:50%` }), `${key.split("/")[1]} ×`);
+    b.setAttribute("aria-label", `Remove ${key}`);
+    b.onclick = () => amsToggle(key, false);
+    return b;
+  }));
+}
+
+function switchRow(label, id, extra) {
+  const s = el("button", { className: "switch", type: "button" });
+  s.setAttribute("role", "switch");
+  s.setAttribute("aria-label", label);
+  s.setAttribute("aria-checked", String(on.has(id)));
+  s.onclick = () => { const v = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", String(v)); setLayer(id, v); };
+  return el("div", { className: "switch-row" }, el("span", {}, label, extra || null), s);
+}
+function buildLayers() {
+  const bases = el("div", { className: "bases" }, ...Object.entries(BASES).map(([key, b]) => {
+    const btn = el("button", { className: "base", type: "button" }, el("span", { style: `background:${b.swatch}` }), el("span", { textContent: b.name }));
+    btn.setAttribute("aria-pressed", String(key === base));
+    btn.onclick = () => { setBase(key); for (const x of bases.children) x.setAttribute("aria-pressed", String(x === btn)); };
+    return btn;
+  }));
+  const noiseKids = el("div", { className: "sub" }, ...NOISE.slice(1).map(([id, label]) => switchRow(label, id)));
+  noiseKids.hidden = true;
+  const noiseMore = el("button", { className: "linkish", type: "button", textContent: " 7 sources ›" });
+  noiseMore.onclick = () => { noiseKids.hidden = !noiseKids.hidden; noiseMore.textContent = noiseKids.hidden ? " 7 sources ›" : " 7 sources ⌄"; };
+  const periodSel = el("select", { className: "when", style: "width:auto" }, ...[[1, "Today"], [7, "Last 7 days"], [30, "Last 30 days"], [365, "Last year"]].map(([v, t]) => new Option(t, v)));
+  periodSel.value = String(period);
+  periodSel.setAttribute("aria-label", "Period for your own data");
+  periodSel.onchange = () => { period = +periodSel.value; store.set("period", period); load(["location", "photos", "flights"]); };
+  const search = el("input", { className: "when", type: "search", placeholder: "Trees, waste, parking, monuments…" });
+  search.setAttribute("aria-label", "Search Amsterdam datasets");
+  const list = el("div", { className: "ams-list" });
+  search.oninput = () => {
+    const q = search.value.trim().toLowerCase();
+    list.replaceChildren(...(!q ? [] : amsDatasets.filter(d => `${d.id} ${d.name} ${d.description}`.toLowerCase().includes(q)).slice(0, 30).map(d => {
+      const tables = el("div");
+      const det = el("details", {}, el("summary", { textContent: d.name, title: d.description }), tables);
+      det.ontoggle = async () => {
+        if (!det.open || tables.childElementCount) return;
+        tables.textContent = "Loading…";
+        try {
+          const names = await amsTables(d.id);
+          tables.replaceChildren(...names.map(t => {
+            const key = `${d.id}/${t}`;
+            const cb = el("input", { type: "checkbox", checked: !!amsActive[key] });
+            cb.onchange = () => amsToggle(key, cb.checked);
+            return el("label", {}, cb, t);
+          }));
+        } catch { tables.textContent = "Couldn't load its tables."; }
+      };
+      return det;
+    })));
+  };
+  const close = el("button", { className: "icon", type: "button" }, icon("close", 20));
+  close.setAttribute("aria-label", "Close layers");
+  close.onclick = () => { layersSheet.hidden = true; document.body.classList.toggle("sheet-open", !panel.hidden); };
+  replayRow.hidden = !on.has("location");
+  $("layers-body").replaceChildren(
+    el("div", { className: "row", style: "justify-content:space-between" }, el("h2", { textContent: "Layers" }), close),
+    bases,
+    el("div", { className: "group" }, el("h3", { textContent: "Weather" }), switchRow("Rain radar", "radar", el("span", { className: "muted", textContent: " live" })),
+      switchRow("Noise", "noise", noiseMore), noiseKids),
+    el("div", { className: "group" }, el("div", { className: "row", style: "justify-content:space-between" }, el("h3", { textContent: "You" }), periodSel),
+      switchRow("Where I've been", "location"), replayRow, switchRow("Heatmap", "heat"), switchRow("Photos", "photos")),
+    el("div", { className: "group" }, el("h3", { textContent: "Around you" }), switchRow("Swimming spots", "swimming"), switchRow("Water temperature", "water"),
+      switchRow("Flights near home", "flights"), switchRow("Earthquakes", "earthquakes")),
+    el("div", { className: "group", style: "gap:8px" }, el("h3", { textContent: "Amsterdam city data" }), el("span", { className: "muted", textContent: "Shows from zoom 14." }), search, amsActiveBox, list),
+  );
+}
+$("fab-layers").onclick = () => {
+  buildLayers();
+  layersSheet.hidden = false;
+  layersSheet.classList.remove("collapsed");
+  document.body.classList.add("sheet-open");
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Directions: BRouter for bike, walk and car (OpenStreetMap; good at cycling), Transitous for public transport
+const MODES = [["trekking", "Bike"], ["fastbike-lowtraffic", "Quiet bike"], ["fastbike", "Fast bike"], ["transit", "Transit"], ["shortest", "Walk"], ["car-fast", "Car"]];
+const BIKE = new Set(["trekking", "fastbike-lowtraffic", "fastbike"]);
+const GOOGLE_MODE = { trekking: "bicycling", "fastbike-lowtraffic": "bicycling", fastbike: "bicycling", transit: "transit", shortest: "walking", "car-fast": "driving" };
+const dir = { mode: store.get("mode", "trekking"), start: store.get("start", "WALK"), end: "WALK" };
+const KINDS = { path: ["Cycle path", "var(--path)", "#15803D"], lane: ["Fietsstraat or lane", "var(--lane)", "#84CC16"],
+  quiet: ["Quiet street", "var(--quiet)", "#2563EB"], busy: ["Busy road", "var(--busy)", "#EA580C"] };
+let routeLayer = null;
+
+$("modes").replaceChildren(...MODES.map(([id, name]) => {
+  const b = el("button", { className: "chip", type: "button", textContent: name });
+  b.dataset.mode = id;
+  b.onclick = () => { dir.mode = id; store.set("mode", id); renderModes(); route(); };
+  return b;
+}));
+for (const [box, key] of [["seg-start", "start"], ["seg-end", "end"]]) {
+  $(box).replaceChildren(...[["WALK", "Walk"], ["BIKE", "Bike"]].map(([v, t]) => {
+    const b = el("button", { type: "button", textContent: t });
+    b.dataset.value = v;
+    b.onclick = () => { dir[key] = v; if (key === "start") store.set("start", v); renderModes(); route(); };
+    return b;
+  }));
+}
+function renderModes() {
+  for (const b of $("modes").children) b.setAttribute("aria-pressed", String(b.dataset.mode === dir.mode));
+  for (const [box, key] of [["seg-start", "start"], ["seg-end", "end"]]) for (const b of $(box).children) b.setAttribute("aria-pressed", String(b.dataset.value === dir[key]));
+  $("transit-opts").hidden = dir.mode !== "transit";
+}
+renderModes();
+$("dir-when").onchange = () => route();
+
+const fromInput = $("dir-from"), toInput = $("dir-to");
+function setField(input, p) { input._place = p || null; input.value = p ? p.title : ""; }
+attachSuggest(fromInput, () => route());
+attachSuggest(toInput, () => route());
+for (const input of [fromInput, toInput]) input.addEventListener("keydown", e => { if (e.key === "Enter") { suggest.hidden = true; route(); } });
+$("dir-swap").onclick = () => {
+  const a = fromInput._place, av = fromInput.value;
+  setField(fromInput, toInput._place); fromInput.value = toInput.value;
+  setField(toInput, a); toInput.value = av;
+  route();
+};
+function openDirections({ from, to }) {
+  setMode("directions");
+  if (placeMarker) { map.removeLayer(placeMarker); placeMarker = null; }
+  setField(fromInput, from || (fromInput._place || { title: "Home", latlng: HOME }));
+  setField(toInput, to || null);
+  if (from && !to) setField(fromInput, from);
+  hidePanel();
+  if (fromInput.value && toInput.value) route(); else toInput.focus();
+}
+$("dir-back").onclick = () => { clearRoute(); hidePanel(); setMode("browse"); };
+
+async function resolve(input) {
+  if (input._place?.here) return { title: "Your location", latlng: await locate() };
+  if (input._place) return input._place;
+  const t = input.value.trim();
+  if (/^home$/i.test(t)) return { title: "Home", latlng: HOME };
+  if (/^(here|your location|my location)$/i.test(t)) return { title: "Your location", latlng: await locate() };
+  const m = t.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m) return { title: t, latlng: [+m[1], +m[2]] };
+  const [first] = await searchPlaces(t);
+  if (!first) throw new Error(`can't find “${t}”`);
+  setField(input, first);
+  return first;
+}
+function clearRoute() { if (routeLayer) map.removeLayer(routeLayer); routeLayer = null; }
+
+let routeSeq = 0;
+async function route() {
+  if (mode !== "directions" || !fromInput.value.trim() || !toInput.value.trim()) return;
+  const seq = ++routeSeq;
+  showPanel(el("p", { className: "muted", textContent: "Finding routes…" }));
+  try {
+    const [a, b] = await Promise.all([resolve(fromInput), resolve(toInput)]);
+    if (dir.mode === "transit") await transitRoute(a, b, seq); else await bikeRoute(a, b, seq);
+  } catch (e) {
+    if (seq === routeSeq) showPanel(el("p", { textContent: `Couldn't find a route: ${e.message}` }));
+  }
+}
+
+// What a stretch of way is like for cycling, from its OpenStreetMap tags as BRouter reports them.
+function classify(wayTags) {
+  const t = Object.fromEntries(wayTags.split(" ").map(kv => kv.split("=")));
+  const cycleway = Object.entries(t).filter(([k]) => k.startsWith("cycleway")).map(([, v]) => v);
+  if (t.highway === "cycleway" || cycleway.some(v => v === "track" || v === "separate") || (["path", "footway", "track", "bridleway"].includes(t.highway) && t.bicycle === "designated")) return "path";
+  if (t.cyclestreet === "yes" || t.bicycle_road === "yes" || cycleway.some(v => /lane/.test(v))) return "lane";
+  if (/^(trunk|primary|secondary|tertiary)(_link)?$/.test(t.highway || "")) return "busy";
+  return "quiet";
+}
+const COBBLES = /surface=(sett|cobblestone|unhewn_cobblestone)/;
+// BRouter's messages describe the way up to each point where it changes; split the line at those points.
+function segments(gj) {
+  const coords = gj.features[0].geometry.coordinates;
+  const msgs = (gj.features[0].properties.messages || []).slice(1);
+  const out = [];
+  let start = 0, i = 0, cobbles = 0;
+  for (const m of msgs) {
+    const lon = +m[0], lat = +m[1];
+    while (i < coords.length && !(Math.round(coords[i][0] * 1e6) === lon && Math.round(coords[i][1] * 1e6) === lat)) i++;
+    if (i >= coords.length) break;
+    const kind = classify(m[9] || "");
+    if (COBBLES.test(m[9] || "")) cobbles += +m[3];
+    out.push({ kind, dist: +m[3], latlngs: coords.slice(start, i + 1).map(c => [c[1], c[0]]) });
+    start = i;
+  }
+  if (start < coords.length - 1) out.push({ kind: "quiet", dist: 0, latlngs: coords.slice(start).map(c => [c[1], c[0]]) });
+  return { segs: out, cobbles };
+}
+
+async function brouter(a, b, profile, alt = 0) {
+  const url = `https://brouter.de/brouter?lonlats=${a[1]},${a[0]}|${b[1]},${b[0]}&profile=${profile}&alternativeidx=${alt}`;
+  const r = await fetch(`${url}&format=geojson&timode=2`);
+  if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+  const gj = await r.json();
+  const p = gj.features[0].properties;
+  return { url, gj, length: +p["track-length"], time: +p["total-time"] };
+}
+
+async function bikeRoute(a, b, seq) {
+  const results = (await Promise.allSettled([0, 1, 2].map(alt => brouter(a.latlng, b.latlng, dir.mode, alt))))
+    .filter(r => r.status === "fulfilled").map(r => r.value);
+  if (!results.length) throw new Error("the router found no way");
+  const routes = results.filter((r, i) => results.findIndex(o => Math.abs(o.length - r.length) < r.length * 0.01) === i);
+  if (seq !== routeSeq) return;
+  let chosen = 0;
+  const render = () => {
+    const r = routes[chosen];
+    const bike = BIKE.has(dir.mode);
+    const { segs, cobbles } = segments(r.gj);
+    clearRoute();
+    const line = r.gj.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    routeLayer = L.featureGroup([L.polyline(line, { color: "#fff", weight: 10, opacity: 0.95 }),
+      ...(bike ? segs.map(s => L.polyline(s.latlngs, { color: KINDS[s.kind][2], weight: 6 })) : [L.polyline(line, { color: "#0B6B53", weight: 6 })])]).addTo(map);
+    map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], paddingTopLeft: matchMedia("(min-width: 760px)").matches ? [440, 40] : [20, 180], paddingBottomRight: [40, 220] });
+    const totals = {};
+    for (const s of segs) totals[s.kind] = (totals[s.kind] || 0) + s.dist;
+    const sum = Object.values(totals).reduce((x, y) => x + y, 0) || 1;
+    const start = el("button", { className: "btn primary", type: "button" }, icon("start", 20), "Start");
+    start.onclick = () => navStart(brouterNav(r, b.title));
+    const alts = routes.length > 1 ? el("div", { className: "row" }, ...routes.map((o, n) => {
+      const x = el("button", { className: "alt", type: "button", textContent: minutes(o.time) });
+      x.setAttribute("aria-pressed", String(n === chosen));
+      x.onclick = () => { chosen = n; render(); };
+      return x;
+    })) : null;
+    const google = `https://www.google.com/maps/dir/?api=1&origin=${a.latlng[0]},${a.latlng[1]}&destination=${b.latlng[0]},${b.latlng[1]}&travelmode=${GOOGLE_MODE[dir.mode]}`;
+    showPanel(
+      el("div", { className: "row", style: "justify-content:space-between;align-items:flex-end" },
+        el("div", {}, el("div", { className: "big-time", textContent: minutes(r.time) }), el("div", { className: "muted", textContent: `${metres(r.length)} · arrive ${hhmm(Date.now() + r.time * 1000)}` })),
+        start),
+      alts,
+      bike ? el("div", { className: "kinds" }, ...Object.keys(KINDS).filter(k => totals[k]).map(k => el("span", { style: `flex:${totals[k] / sum};background:${KINDS[k][1]}` }))) : null,
+      bike ? el("div", { className: "legend" }, ...Object.keys(KINDS).filter(k => totals[k]).map(k => el("span", {}, el("span", { className: "sw", style: `background:${KINDS[k][1]}` }), `${KINDS[k][0]} ${metres(totals[k])}`))) : null,
+      bike && cobbles > 50 ? el("div", { className: "muted", textContent: `Includes ${metres(cobbles)} of cobbles.` }) : null,
+      el("div", { className: "links" }, el("a", { href: google, target: "_blank", rel: "noopener", textContent: "Open in Google Maps" }),
+        el("a", { href: `${r.url}&format=gpx`, target: "_blank", rel: "noopener", textContent: "Download GPX" })),
+      el("div", { className: "muted", textContent: "Routes by BRouter on OpenStreetMap." }),
+    );
+  };
+  render();
+}
+
+// Public transport, with walking or cycling to the first stop and from the last.
+const TRANSIT = "https://api.transitous.org/api/v1/plan";
+function decodePolyline(s, precision) {
+  const f = 10 ** precision, out = [];
+  let i = 0, lat = 0, lon = 0;
+  const next = () => {
+    let shift = 0, result = 0, b;
+    do { b = s.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (i < s.length) { lat += next(); lon += next(); out.push([lat / f, lon / f]); }
+  return out;
+}
+const STREET = new Set(["BIKE", "WALK"]);
+const legName = l => l.mode === "BIKE" ? "Bike" : l.mode === "WALK" ? "Walk" : (l.routeShortName || l.mode.toLowerCase().replace("_", " "));
+const legColour = l => l.routeColor ? `#${l.routeColor}` : "#1D4ED8";
+
+async function transitRoute(a, b, seq) {
+  const q = new URLSearchParams({ fromPlace: `${a.latlng[0]},${a.latlng[1]}`, toPlace: `${b.latlng[0]},${b.latlng[1]}` });
+  if ($("dir-when").value) q.set("time", new Date($("dir-when").value).toISOString());
+  if (dir.start === "BIKE") { q.set("preTransitModes", "BIKE"); q.set("maxPreTransitTime", "2400"); }
+  if (dir.end === "BIKE") { q.set("postTransitModes", "BIKE"); q.set("maxPostTransitTime", "2400"); }
+  const r = await fetch(`${TRANSIT}?${q}`);
+  if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+  const its = ((await r.json()).itineraries || []).slice(0, 5);
+  if (!its.length) throw new Error("no connection found");
+  if (seq !== routeSeq) return;
+  let chosen = 0;
+  const draw = it => {
+    clearRoute();
+    routeLayer = L.featureGroup(it.legs.map(l => {
+      const pts = decodePolyline(l.legGeometry.points, l.legGeometry.precision);
+      return STREET.has(l.mode)
+        ? L.polyline(pts, { color: l.mode === "BIKE" ? "#15803D" : "#6B7280", weight: 5, dashArray: l.mode === "WALK" ? "2 8" : null })
+        : L.polyline(pts, { color: legColour(l), weight: 7 });
+    })).addTo(map);
+    map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], paddingTopLeft: matchMedia("(min-width: 760px)").matches ? [440, 40] : [20, 230], paddingBottomRight: [40, 300] });
+  };
+  const cards = its.map((it, n) => {
+    const firstTransit = it.legs.find(l => !STREET.has(l.mode));
+    const card = el("button", { className: "trip", type: "button" },
+      el("span", { className: "top" }, el("span", { textContent: `${hhmm(it.startTime)} → ${hhmm(it.endTime)}` }), el("span", { textContent: minutes(it.duration) })),
+      el("span", { className: "legs" }, ...it.legs.flatMap((l, k) => {
+        const chip = el("span", { className: `leg${l.mode === "BIKE" ? " bike" : ""}`, textContent: `${legName(l)} ${Math.round(l.duration / 60)}` });
+        if (!STREET.has(l.mode)) chip.style.cssText = `background:${legColour(l)};color:#fff`;
+        return k ? [el("span", { className: "muted", textContent: "›" }), chip] : [chip];
+      }), it.legs.some(l => l.realTime) ? el("span", { className: "live", textContent: "● live" }) : null),
+      it.legs[0].mode === "BIKE" && firstTransit ? el("span", { className: "muted", textContent: `Park your bike at ${firstTransit.from.name}` }) : null);
+    card.setAttribute("aria-pressed", String(n === chosen));
+    card.onclick = () => { chosen = n; for (const c of cards) c.setAttribute("aria-pressed", String(c === card)); draw(it); };
+    return card;
+  });
+  draw(its[0]);
+  const start = el("button", { className: "btn primary grow", type: "button" }, icon("start", 20), "Start");
+  start.onclick = async () => { start.disabled = true; navStart(await itineraryNav(its[chosen], b.title)); start.disabled = false; };
+  const google = `https://www.google.com/maps/dir/?api=1&origin=${a.latlng[0]},${a.latlng[1]}&destination=${b.latlng[0]},${b.latlng[1]}&travelmode=transit`;
+  showPanel(...cards, el("div", { className: "row" }, start),
+    dir.end === "BIKE" ? el("div", { className: "muted", textContent: "Ending by bike assumes an OV-fiets or your own bike there: most trains don't take bikes at rush hour." }) : null,
+    el("div", { className: "links" }, el("a", { href: google, target: "_blank", rel: "noopener", textContent: "Open in Google Maps" })),
+    el("div", { className: "muted" }, "Times by ", el("a", { href: "https://transitous.org/sources/", target: "_blank", rel: "noopener", textContent: "Transitous" }), " on OpenStreetMap."));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Navigation: follow the phone along the route, show the next turn and say it as it comes up
+// BRouter voice hints are [point index, command, roundabout exit, distance, angle]; commands from BRouter's VoiceHint.
+const TURNS = { 2: ["Turn left", "left"], 3: ["Bear left", "left"], 4: ["Turn sharp left", "left"], 5: ["Turn right", "right"], 6: ["Bear right", "right"],
+  7: ["Turn sharp right", "right"], 8: ["Keep left", "left"], 9: ["Keep right", "right"], 10: ["Make a U-turn", "uturn"], 11: ["Make a U-turn", "uturn"], 12: ["Make a U-turn", "uturn"] };
+function hintSteps(gj) {
+  const line = gj.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+  const steps = (gj.features[0].properties.voicehints || []).filter(h => TURNS[h[1]] || h[1] === 14 || h[1] === 15)
+    .map(h => h[1] === 14 || h[1] === 15 ? { at: line[h[0]], text: `At the roundabout take exit ${h[2]}`, icon: "right" } : { at: line[h[0]], text: TURNS[h[1]][0], icon: TURNS[h[1]][1] });
+  return { line, steps };
+}
+function brouterNav(r, toName) {
+  const { line, steps } = hintSteps(r.gj);
+  return { line, steps, length: r.length, time: r.time, to: toName };
+}
+async function itineraryNav(it, toName) {
+  const line = [], steps = [];
+  for (const l of it.legs) {
+    const from = [l.from.lat, l.from.lon], to = [l.to.lat, l.to.lon];
+    if (STREET.has(l.mode)) {
+      // Transitous gives no turns for these legs; BRouter does.
+      try {
+        const nav = hintSteps((await brouter(from, to, l.mode === "BIKE" ? "trekking" : "shortest")).gj);
+        line.push(...nav.line);
+        steps.push(...nav.steps);
+      } catch { line.push(...decodePolyline(l.legGeometry.points, l.legGeometry.precision)); }
+      if (l.mode === "BIKE" && it.legs[it.legs.indexOf(l) + 1]) steps.push({ at: to, text: `Park your bike at ${l.to.name}`, icon: "flag" });
+    } else {
+      line.push(...decodePolyline(l.legGeometry.points, l.legGeometry.precision));
+      steps.push({ at: from, text: `Board ${legName(l)} towards ${l.headsign || l.to.name} at ${hhmm(l.startTime)}`, icon: "train" });
+      steps.push({ at: to, text: `Get off at ${l.to.name}`, icon: "train" });
+    }
+  }
+  return { line, steps, end: it.endTime, to: toName };
+}
+
+const nav = { route: null, watch: null, idx: 0, spoken: -1, off: 0, follow: true, wake: null, cum: [] };
+const me = L.circleMarker(HOME, { radius: 9, color: "#fff", weight: 3, fillColor: "#1A73E8", fillOpacity: 1 });
+const say = t => { try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(t)); } catch {} };
+function navStart(route) {
+  nav.route = route;
+  const end = route.line[route.line.length - 1];
+  if (route.steps.at(-1)?.at !== end) route.steps.push({ at: end, text: `Arrive at ${route.to}`, icon: "flag" });
+  nav.cum = [0];
+  for (let i = 1; i < route.line.length; i++) nav.cum.push(nav.cum[i - 1] + L.latLng(route.line[i - 1]).distanceTo(route.line[i]));
+  Object.assign(nav, { idx: 0, spoken: -1, off: 0, follow: true });
+  setMode("navigate");
+  $("nav-top").hidden = $("nav-bottom").hidden = false;
+  $("nav-icon").replaceChildren(icon("straight", 44));
+  $("nav-dist").textContent = "";
+  $("nav-text").textContent = "Waiting for your position…";
+  navigator.wakeLock?.request("screen").then(w => { nav.wake = w; }).catch(() => {});
+  nav.watch = navigator.geolocation.watchPosition(navUpdate, e => { $("nav-text").textContent = `No position: ${e.message}`; }, { enableHighAccuracy: true, maximumAge: 2000 });
+}
+function navUpdate(p) {
+  const at = L.latLng(p.coords.latitude, p.coords.longitude);
+  me.setLatLng(at).addTo(map);
+  if (nav.follow) map.setView(at, Math.max(map.getZoom(), 17));
+  const steps = nav.route.steps, line = nav.route.line;
+  // A step is done once you come within 20 m of it, or of any later step.
+  for (let j = steps.length - 1; j >= nav.idx; j--) if (at.distanceTo(steps[j].at) < 20) { nav.idx = j + 1; break; }
+  let nearest = 0, best = Infinity;
+  line.forEach((q, i) => { const d = at.distanceTo(q); if (d < best) { best = d; nearest = i; } });
+  const left = nav.cum[nav.cum.length - 1] - nav.cum[nearest] + best;
+  const secs = nav.route.end ? (new Date(nav.route.end) - Date.now()) / 1000 : nav.route.time * left / Math.max(nav.route.length, 1);
+  $("nav-eta").textContent = hhmm(Date.now() + secs * 1000);
+  $("nav-left").textContent = `${minutes(secs)} · ${metres(left)} to ${nav.route.to}`;
+  if (nav.idx >= steps.length) {
+    $("nav-dist").textContent = "";
+    $("nav-text").textContent = `You have arrived`;
+    $("nav-then").hidden = true;
+    if (nav.spoken !== nav.idx) { say("You have arrived"); nav.spoken = nav.idx; }
+    return;
+  }
+  const s = steps[nav.idx], d = at.distanceTo(s.at);
+  $("nav-icon").replaceChildren(icon(s.icon || "straight", 44));
+  $("nav-dist").textContent = metres(d);
+  $("nav-text").textContent = s.text;
+  const then = steps[nav.idx + 1];
+  $("nav-then").hidden = !then || at.distanceTo(then.at) - d > 400;
+  if (then) $("nav-then").replaceChildren("Then", icon(then.icon || "straight", 20), then.text);
+  if (d < 80 && nav.spoken !== nav.idx) { say(s.text); nav.spoken = nav.idx; }
+  // Off the route for three fixes in a row: offer a new route from here.
+  nav.off = best > 50 ? nav.off + 1 : 0;
+  $("nav-reroute").hidden = nav.off < 3;
+}
+function navStop() {
+  if (nav.watch !== null) navigator.geolocation.clearWatch(nav.watch);
+  nav.watch = null;
+  nav.wake?.release().catch(() => {});
+  $("nav-top").hidden = $("nav-bottom").hidden = $("nav-then").hidden = true;
+  me.remove();
+  setMode("directions");
+  panel.hidden = false;
+  document.body.classList.add("sheet-open");
+}
+$("nav-stop").onclick = navStop;
+$("nav-reroute").onclick = () => { navStop(); setField(fromInput, { title: "Your location", here: true }); route(); };
+map.on("dragstart", () => { if (mode === "navigate") nav.follow = false; });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Start: restore layers, load your data and the city's dataset list
+for (const id of on) if (LAYERS[id]) map.addLayer(LAYERS[id]);
+load(Object.keys(groups));
+fetch(AMS).then(r => r.json()).then(j => {
+  amsDatasets = Object.entries(j.datasets).map(([id, d]) => ({ id, name: d.service_name || id, description: d.description || "" })).sort((a, b) => a.name.localeCompare(b.name));
+}).catch(() => {});
+for (const key of store.get("ams", [])) amsToggle(key, true);
+setMode("browse");
+</script>
+</body>
+</html>

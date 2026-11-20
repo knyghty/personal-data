@@ -1,0 +1,33 @@
+app = "glimmering-voice-610"
+primary_region = "ams"
+kill_timeout = "300s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  GITHUB_REPO = "knyghty/personal-data"
+  GITHUB_BRANCH = "main"
+  GITHUB_USER = "knyghty"
+  PUBLIC_URL = "https://glimmering-voice-610.fly.dev"
+  # HA_URL, HA_LOCATION_ENTITY, STEAM_ID, HOME_LAT and HOME_LON (Home Assistant's home zone) are secrets.
+  HA_BACKFILL_DAYS = "10"
+  HA_STATS_BACKFILL_DAYS = "365"
+  LASTFM_USER = "knyghty"
+  STATE_PATH = "/data/state.json"
+  RUST_LOG = "info"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
