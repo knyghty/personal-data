@@ -267,17 +267,21 @@ def main() -> int:
 
 
 def compact(con: duckdb.DuckDBPyConnection) -> None:
-    """Once a week, merge small files and delete the files of snapshots older than a week.
+    """Once a day, merge small files, expire snapshots older than an hour and delete the files nothing lists.
 
-    Every rebuilt table and every incremental batch leaves files behind, so without this the bucket only grows.
+    Every rebuilt table and every incremental batch adds a snapshot, a table version and files. Each table version
+    keeps its own SQLite table in the catalog, and every connection reads them all on ATTACH: a week of them made
+    ATTACH take 30 seconds, an expiry take 90 minutes, and the old files fill the volume.
     """
     last = con.execute("SELECT max(inputs) FROM staging._built WHERE tbl = 'compacted'").fetchall()[0][0]
-    if last and time.time() - float(last) < 7 * 86400:
+    if last and time.time() - float(last) < 86400:
         return
     started = time.monotonic()
     con.execute("CALL ducklake_merge_adjacent_files('lake')")
-    con.execute("CALL ducklake_expire_snapshots('lake', older_than => now() - INTERVAL 7 DAY)")
-    con.execute("CALL ducklake_cleanup_old_files('lake', older_than => now() - INTERVAL 7 DAY)")
+    con.execute("CALL ducklake_expire_snapshots('lake', older_than => now() - INTERVAL 1 HOUR)")
+    con.execute("CALL ducklake_cleanup_old_files('lake', cleanup_all => true)")
+    # A build killed before its commit leaves files that no snapshot lists. Only one build runs at a time.
+    con.execute("CALL ducklake_delete_orphaned_files('lake', older_than => now() - INTERVAL 1 DAY)")
     con.execute("DELETE FROM staging._built WHERE tbl = 'compacted'")
     con.execute("INSERT INTO staging._built VALUES ('compacted', '', ?)", [str(time.time())])
     print(f"compacted in {time.monotonic() - started:.0f}s", file=sys.stderr)
