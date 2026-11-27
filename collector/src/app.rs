@@ -159,6 +159,9 @@ pub(crate) struct Config {
     pub prijsprofeet_url: String,
     /// Where the outside world reaches this server, for OAuth redirects.
     pub public_url: String,
+    /// The query server's status URL, secret token included: `INGEST_URL` with `/status` for `/ingest`. `None` skips
+    /// the `query_server` check.
+    pub query_status_url: Option<String>,
     /// Rijkswaterstaat's water data API. Empty turns the water source off.
     pub rws_url: String,
     /// Bearer token the Mac sends with Screen Time exports.
@@ -542,6 +545,10 @@ impl Env {
             public_url: tri!(self.required("PUBLIC_URL"))
                 .trim_end_matches('/')
                 .to_owned(),
+            query_status_url: self.get("INGEST_URL").and_then(|url| {
+                url.strip_suffix("/ingest")
+                    .map(|base| format!("{base}/status"))
+            }),
             rws_url: "https://ddapi20-waterwebservices.rijkswaterstaat.nl".into(),
             screen_time_secret: self.get("SCREEN_TIME_SECRET"),
             steam_api_key: self.get("STEAM_API_KEY"),

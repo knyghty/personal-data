@@ -23,8 +23,10 @@ import hashlib
 import os
 import re
 import resource
+import sqlite3
 import sys
 import time
+from contextlib import closing
 
 import duckdb
 
@@ -116,6 +118,10 @@ def connect() -> duckdb.DuckDBPyConnection:
             con.execute(f"SET {key} = '{value}'")
     if DATA.startswith("s3://"):
         con.execute(secret())
+    # In WAL mode readers never block the build's commits, and the build never blocks readers. In the default rollback
+    # mode one reader that never finishes stalls every build and, through the build's pending write, every query.
+    with closing(sqlite3.connect(CATALOG, timeout=60)) as db:
+        db.execute("PRAGMA journal_mode = WAL")
     con.execute(f"ATTACH 'ducklake:sqlite:{CATALOG}' AS lake (DATA_PATH '{DATA}'); USE lake")
     con.execute("CREATE SCHEMA IF NOT EXISTS staging")
     con.execute("CREATE TABLE IF NOT EXISTS staging._ingested (tbl VARCHAR, digest VARCHAR, filename VARCHAR)")

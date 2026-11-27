@@ -164,6 +164,7 @@ pub(crate) fn app_with(github_api: &str, tweak: impl FnOnce(&mut Config)) -> Arc
         prijsprofeet_key: None,
         prijsprofeet_url: "http://localhost".into(),
         public_url: "http://localhost".into(),
+        query_status_url: None,
         rws_url: String::new(),
         screen_time_secret: Some(SCREEN.into()),
         steam_api_key: None,

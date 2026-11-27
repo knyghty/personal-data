@@ -21,6 +21,7 @@ pub(super) mod luchtmeetnet;
 pub(super) mod moneybird;
 pub(super) mod network;
 pub(super) mod offers;
+pub(super) mod query_server;
 pub(super) mod screen_time;
 pub(super) mod steam;
 pub(super) mod twitch;
@@ -99,5 +100,6 @@ pub(crate) fn all() -> Vec<Box<dyn Source>> {
         Box::new(degiro::PERSONAL),
         Box::new(degiro::PENSION),
         Box::new(offers::Offers),
+        Box::new(query_server::QueryServer),
     ]
 }

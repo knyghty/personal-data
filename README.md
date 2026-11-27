@@ -46,6 +46,7 @@ Sources and types:
 | apple_media_services | `export`: the privacy.apple.com export in Apple's folders, nested zips unpacked: Apple Music plays and library, podcasts, Apple TV, purchases, store activity, TestFlight, Game Center | by hand, dated by the last day covered |
 | moneybird | per administration `sales_invoice`, `purchase_invoice`, `receipt`, `journal_document`, `contact`, `financial_mutation`, `time_entry`, and daily `administration`, `ledger_account`, `project`, `product`, `tax_rate`, `financial_account`, `recurring_sales_invoice` | hourly, only new or changed items; daily only on change |
 | offers | per store `prijsprofeet` (supermarket offers from the PrijsProfeet API) and `folderz` (drugstore offers the Pi parses from folderz.nl) | daily pull and daily push, only offers not stored before |
+| query_server | nothing stored: checks that the query server answers queries and builds its tables | hourly |
 
 ## How it runs
 
@@ -558,7 +559,7 @@ Sentry's free plan covers this: 5k errors a month, one cron monitor and email al
 1. Create a Sentry project of type Rust and copy its DSN. This repo reports to the project `personal-data`.
 2. Set it as a secret: `fly secrets set SENTRY_DSN=...`
 
-Every logged error becomes a Sentry issue, with the warnings before it as breadcrumbs. Each run sends a check-in to the cron monitor `hourly-run`, which the first run creates. If a run fails, is missed for 30 minutes or takes over 55 minutes, Sentry opens an issue and emails you. If the `personal-data-sync-health` automation pushed nothing for 24 hours after its first push, the Apple Health source fails. Without `SENTRY_DSN` all of this is off.
+Every logged error becomes a Sentry issue, with the warnings before it as breadcrumbs. Each run sends a check-in to the cron monitor `hourly-run`, which the first run creates. If a run fails, is missed for 30 minutes or takes over 55 minutes, Sentry opens an issue and emails you. If the `personal-data-sync-health` automation pushed nothing for 24 hours after its first push, the Apple Health source fails. The `query_server` job reads the query server's `/<token>/status` every hour. It fails if a query cannot read the catalog, a build runs over 30 minutes, or no build succeeded for 3 hours. Without `SENTRY_DSN` all of this is off.
 
 ### Automated fixes
 

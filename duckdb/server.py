@@ -9,6 +9,7 @@ Every route sits under /<MCP_TOKEN>/, so the URL is the credential:
 - POST /<token>/ingest: the collector names the files it stored in the bucket. Download them into the local
   copy of raw/ and run build.py in the background; answer 202 at once.
 - POST /<token>/rebuild: list the bucket for missing files, then run build.py, and answer when it is done.
+- GET /<token>/status: whether the catalog is readable, the last successful build and the running one, as JSON.
 - POST /sql: one read-only query (the body) as JSON rows, with `Authorization: Bearer <MCP_TOKEN>`; Grafana's
   data source.
 - /map and /grafana: a map and Grafana behind a passkey login; see web.py.
@@ -46,6 +47,8 @@ REPO = os.environ.get("GITHUB_REPO", "knyghty/personal-data")
 BRANCH = os.environ.get("GITHUB_BRANCH", "main")
 IDLE_SECONDS = int(os.environ.get("IDLE_SECONDS", "300"))
 RECONCILE_SECONDS = 24 * 3600
+BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "3600"))
+BUILT = os.path.join(ROOT, ".built")  # its mtime is when a build last succeeded
 QUERY_TIMEOUT = 120
 MAX_CHARS = 60_000
 SQL_MAX_ROWS = 100_000
@@ -83,12 +86,16 @@ def connect() -> duckdb.DuckDBPyConnection:
             "file_search_path": ROOT,
         },
     )
-    if LAKE_DATA.startswith("s3://"):
-        con.execute(sync.secret())
-    con.execute(f"ATTACH 'ducklake:sqlite:{CATALOG}' AS personal (READ_ONLY); USE personal")
-    # Files outside raw/ and the lake stay unreadable, and queries cannot change the settings back.
-    con.execute(f"SET allowed_directories = ['{ROOT}/raw/', '{LAKE_DATA}', '{CATALOG}']")
-    con.execute("SET TimeZone = 'UTC'; SET enable_external_access = false; SET lock_configuration = true")
+    try:
+        if LAKE_DATA.startswith("s3://"):
+            con.execute(sync.secret())
+        con.execute(f"ATTACH 'ducklake:sqlite:{CATALOG}' AS personal (READ_ONLY); USE personal")
+        # Files outside raw/ and the lake stay unreadable, and queries cannot change the settings back.
+        con.execute(f"SET allowed_directories = ['{ROOT}/raw/', '{LAKE_DATA}', '{CATALOG}']")
+        con.execute("SET TimeZone = 'UTC'; SET enable_external_access = false; SET lock_configuration = true")
+    except BaseException:
+        con.close()  # an attached catalog stays locked until its connection closes
+        raise
     return con
 
 
@@ -142,6 +149,8 @@ def query(sql: str, max_rows: int = 200) -> str:
 
 
 build_lock = threading.Lock()
+build_started: float | None = None
+last_exit: int | None = None
 pending: set[str] = set()
 pending_lock = threading.Lock()
 work = threading.Event()
@@ -174,6 +183,7 @@ def fetch_sql() -> None:
 
 def build_sync(paths: list[str], reconcile: bool = False) -> tuple[int, str]:
     """Download `paths`, list the bucket when asked or once a day, then run build.py from ROOT."""
+    global build_started, last_exit
     with build_lock:
         con = sync.connect()
         got = sync.download(con, sync.keys(paths))
@@ -194,8 +204,20 @@ def build_sync(paths: list[str], reconcile: bool = False) -> tuple[int, str]:
             "LAKE_DATA": LAKE_DATA,
         }
         build = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build.py")
-        r = subprocess.run([sys.executable, build], cwd=ROOT, env=env)
-    return r.returncode, "build failed, see the log\n" if r.returncode else "ok\n"
+        build_started = time.time()
+        try:
+            code = subprocess.run([sys.executable, build], cwd=ROOT, env=env, timeout=BUILD_TIMEOUT).returncode
+        except subprocess.TimeoutExpired:
+            # A stuck build would keep the machine running and the tables stale; the next ingest starts a new one.
+            print(f"build: killed after {BUILD_TIMEOUT}s", file=sys.stderr, flush=True)
+            code = -1
+        finally:
+            build_started = None
+        last_exit = code
+        if code == 0:
+            with open(BUILT, "w"):
+                pass
+    return code, "build failed, see the log\n" if code else "ok\n"
 
 
 def worker() -> None:
@@ -250,6 +272,34 @@ async def sql(request: Request) -> Response:
 async def rebuild(request: Request) -> PlainTextResponse:
     code, log = await asyncio.to_thread(build_sync, [], True)
     return PlainTextResponse(log, status_code=500 if code else 200)
+
+
+def catalog_check() -> str:
+    with connect() as con:
+        con.execute("SELECT max(built_at) FROM build_info").fetchall()
+    return "ok"
+
+
+async def status(request: Request) -> JSONResponse:
+    """Whether queries can read the catalog, when a build last succeeded, and how long the current one has run.
+
+    The collector's `query_server` job checks this every hour and fails when the tables are stuck."""
+    try:
+        catalog = await asyncio.wait_for(asyncio.to_thread(catalog_check), timeout=30)
+    except TimeoutError:
+        catalog = "no answer within 30s"
+    except duckdb.Error as e:
+        catalog = str(e).splitlines()[0]
+    succeeded = os.path.getmtime(BUILT) if os.path.exists(BUILT) else None
+    started = build_started
+    return JSONResponse(
+        {
+            "catalog": catalog,
+            "last_success": succeeded and time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(succeeded)),
+            "last_exit": last_exit,
+            "building_seconds": started and round(time.time() - started),
+        }
+    )
 
 
 async def ingest(request: Request) -> Response:
@@ -310,6 +360,7 @@ app = Starlette(
         Route("/health", lambda request: PlainTextResponse("ok")),
         Route(f"/{TOKEN}/rebuild", rebuild, methods=["POST"]),
         Route(f"/{TOKEN}/ingest", ingest, methods=["POST"]),
+        Route(f"/{TOKEN}/status", status),
         Route("/sql", sql, methods=["POST"]),
         *web.auth_routes(TOKEN),
         *web.map_routes(connect),
