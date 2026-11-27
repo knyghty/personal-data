@@ -155,6 +155,7 @@ pending: set[str] = set()
 pending_lock = threading.Lock()
 work = threading.Event()
 last_request = time.monotonic()
+last_path = "none"
 
 
 def fetch_sql() -> None:
@@ -320,8 +321,10 @@ class Activity:
         self.app = app
 
     async def __call__(self, scope, receive, send) -> None:
-        global last_request
+        global last_request, last_path
         last_request = time.monotonic()
+        if scope["type"] in ("http", "websocket"):
+            last_path = f"{scope.get('method', 'WS')} {scope['path'].replace(TOKEN, '<token>')}"
         await self.app(scope, receive, send)
         last_request = time.monotonic()
 
@@ -331,12 +334,21 @@ server: uvicorn.Server | None = None
 
 def watchdog() -> None:
     """Exit once the server has been idle for IDLE_SECONDS, so the machine stops; requests start it again."""
+    awake = time.monotonic()
     while True:
         time.sleep(15)
         if server and not busy() and time.monotonic() - last_request > IDLE_SECONDS:
             print("idle, exiting", file=sys.stderr, flush=True)
             server.should_exit = True
             return
+        # Say what keeps the machine running, so a machine that never stops shows why in the log.
+        if time.monotonic() - awake > IDLE_SECONDS:
+            awake = time.monotonic()
+            print(
+                f"awake: busy={busy()}, last request {last_path} {time.monotonic() - last_request:.0f}s ago",
+                file=sys.stderr,
+                flush=True,
+            )
 
 
 @asynccontextmanager
