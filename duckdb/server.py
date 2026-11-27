@@ -20,6 +20,7 @@ starts it again.
 
 import asyncio
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -314,19 +315,46 @@ async def ingest(request: Request) -> Response:
     return PlainTextResponse("queued\n", status_code=202)
 
 
+MCP_METHOD = re.compile(rb'"method"\s*:\s*"([^"]+)"')
+
+
 class Activity:
-    """Remember when the last request came in, for the idle exit."""
+    """Remember when the last request came in, for the idle exit.
+
+    On the MCP endpoint only tool calls count: connected clients ping and list tools all day, which would keep the
+    machine running for nothing.
+    """
 
     def __init__(self, app) -> None:
         self.app = app
 
     async def __call__(self, scope, receive, send) -> None:
         global last_request, last_path
-        last_request = time.monotonic()
-        if scope["type"] in ("http", "websocket"):
-            last_path = f"{scope.get('method', 'WS')} {scope['path'].replace(TOKEN, '<token>')}"
-        await self.app(scope, receive, send)
-        last_request = time.monotonic()
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        name = f"{scope['method']} {scope['path'].replace(TOKEN, '<token>')}"
+        if not scope["path"].endswith("/mcp"):
+            last_request, last_path = time.monotonic(), name
+            await self.app(scope, receive, send)
+            last_request = time.monotonic()
+            return
+        called = False
+
+        async def peek():
+            global last_request, last_path
+            nonlocal called
+            message = await receive()
+            if m := MCP_METHOD.search(message.get("body", b"")):
+                method = m.group(1).decode()
+                if method == "tools/call":
+                    called = True
+                    last_request, last_path = time.monotonic(), f"{name} {method}"
+            return message
+
+        await self.app(scope, peek, send)
+        if called:
+            last_request = time.monotonic()
 
 
 server: uvicorn.Server | None = None
